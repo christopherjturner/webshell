@@ -1,0 +1,48 @@
+<html>
+
+<head>
+  <link rel="stylesheet" href="/assets/shell.css" />
+  <link rel="stylesheet" href="/assets/xterm.min.css" />
+  <script src="/assets/xterm-addon-fit.min.js"></script>
+  <script src="/assets/xterm.min.js"></script>
+  <script src="/assets/addon-attach.min.js"></script>
+
+</head>
+
+<body>
+
+  <div class="tabs-container">
+
+    <input type="radio" id="tab-1" name="tabs" checked>
+    <label for="tab-1" class="tab-label">
+      Terminal
+    </label>
+    <div class="tab-content">
+      <div id="term-border">
+        <div id="terminal"></div>
+      </div>
+    </div>
+
+    <input type="radio" id="tab-2" name="tabs">
+    <label for="tab-2" class="tab-label">
+      Files
+    </label>
+    <div class="tab-content">
+      <b>Upload</b>
+      <form id="uploadForm">
+        <input name="file" type="file" id="fileInput">
+        <button type="submit">Upload</button>
+      </form>
+      <div id="files"></div>
+    </div>
+
+  </div>
+
+  <script src="/assets/main.js"></script>
+  <script type="text/javascript">
+    init({{ .Prefix }})
+    initFilePage({{ .Prefix }})
+    refreshFiles({{ .Prefix }})
+  </script>
+</body>
+</html>
