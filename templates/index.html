@@ -6,14 +6,13 @@
   <script src="/assets/xterm-addon-fit.min.js"></script>
   <script src="/assets/xterm.min.js"></script>
   <script src="/assets/addon-attach.min.js"></script>
-
 </head>
 
 <body>
 
   <div class="tabs-container">
 
-    <input type="radio" id="tab-1" name="tabs" checked>
+    <input type="radio" id="tab-1" name="tabs" onclick="refreshFiles()" checked>
     <label for="tab-1" class="tab-label">
       Terminal
     </label>
@@ -23,17 +22,19 @@
       </div>
     </div>
 
-    <input type="radio" id="tab-2" name="tabs">
+    <input type="radio" id="tab-2" name="tabs" onclick="refreshFiles()">
     <label for="tab-2" class="tab-label">
       Files
     </label>
     <div class="tab-content">
-      <b>Upload</b>
-      <form id="uploadForm">
-        <input name="file" type="file" id="fileInput">
-        <button type="submit">Upload</button>
-      </form>
-      <div id="files"></div>
+      <div id="files-border">
+        <b>Upload</b>
+        <form id="uploadForm">
+          <input name="file" type="file" id="fileInput">
+          <button type="submit">Upload</button>
+        </form>
+        <div id="files"></div>
+      </div>
     </div>
 
   </div>

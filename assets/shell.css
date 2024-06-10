@@ -1,5 +1,6 @@
 body {
     font-family: monospace;
+    background: #343c44;
 }
 
 #term-border {
@@ -7,31 +8,40 @@ body {
     background: #000;
 }
 
+#files-border {
+    padding: 10px;
+    background: slategray;
+}
+
+
 .tabs-container {
     display: flex;
     flex-wrap: wrap;
+}
 
-    >input[type="radio"] {
-        display: none;
+/* Remove the > combinator */
+.tabs-container input[type="radio"] {
+    display: none;
+}
 
-        &:checked+.tab-label {
-            background-color: darkslategray;
-        }
-    }
+/* Adjusted adjacent sibling selector */
+.tabs-container input[type="radio"]:checked + .tab-label {
+    background-color: slategray;
+}
 
-    >input[type="radio"]:not(:checked)+.tab-label+.tab-content {
-        display: none;
-    }
+/* Adjusted adjacent sibling selector */
+.tabs-container input[type="radio"]:not(:checked) + .tab-label + .tab-content {
+    display: none;
+}
 
-    .tab-label {
-        padding: 5px 15px;
-        color: white;
-        background-color: slategray;
-    }
+.tab-label {
+    padding: 5px 15px;
+    color: white;
+    background-color: darkslategray;
+}
 
-    .tab-content {
-        order: 99;
-        width: 100%;
-        display: block;
-    }
+.tab-content {
+    order: 99;
+    width: 100%;
+    display: block;
 }

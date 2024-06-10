@@ -54,6 +54,9 @@ func homeDirHandler(w http.ResponseWriter, r *http.Request) {
 	filePaths := []string{}
 
 	filepath.Walk(config.HomeDir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !info.IsDir() && len(filePaths) < MAX_HOME_FILES {
 			filePaths = append(filePaths, filepath.Join(path, info.Name()))
 		}
