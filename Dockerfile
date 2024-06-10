@@ -1,5 +1,5 @@
 FROM debian
 
-COPY cmd/cmd /usr/bin/cdpshell
+COPY cmd/cmd /usr/bin/webshell
 
-CMD [ /usr/bin/cdpshell ]
+CMD [ "/usr/bin/cdpshell" ]
