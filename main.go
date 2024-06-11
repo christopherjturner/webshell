@@ -82,18 +82,6 @@ func once(h http.Handler) http.Handler {
 	})
 }
 
-func checkKey(k string, h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := r.URL.Query().Get("key")
-
-		if key != k {
-			http.Error(w, "expired", http.StatusUnauthorized)
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
-}
-
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }

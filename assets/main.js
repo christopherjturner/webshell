@@ -1,29 +1,5 @@
 var terminal
 
-class XtermWebfont {
-  activate(terminal) {
-    this._terminal = terminal;
-    terminal.loadWebfontAndOpen = function (element) {
-      const fontFamily = this.options.fontFamily;
-      const regular = new FontFaceObserver(fontFamily).load();
-      const bold = new FontFaceObserver(fontFamily, {
-        weight: "bold"
-      }).load();
-      return regular.constructor.all([regular, bold]).then(() => {
-        this.open(element);
-        return this;
-      }, () => {
-        this.options.fontFamily = "Courier";
-        this.open(element);
-        return this;
-      });
-    };
-  }
-  dispose() {
-    delete this._terminal.loadWebfontAndOpen;
-  }
-};
-
 function init(shellPath) {
   terminal = new Terminal({
     screenKeys: true,
@@ -33,7 +9,7 @@ function init(shellPath) {
     maximizeWin: true,
     screenReaderMode: true,
     cols: 128,
-    fontFamily: 'DejaVu Sans Mono'
+      fontFamily: 'Terminal, monospace'
   });
 
 
@@ -46,11 +22,8 @@ function init(shellPath) {
 
   terminal.loadAddon(attachAddon);
   terminal.loadAddon(fitAddon);
-  //terminal.loadAddon(new XtermWebfont()) // TODO: figure out how to get this to actually load webfonts!
-  terminal._initialized = true;
-
   terminal.open(document.getElementById("terminal"));
-  //terminal.loadWebfontAndOpen(document.getElementById("terminal"));
+  terminal._initialized = true;
 
 
   ws.onclose = function(event) {
