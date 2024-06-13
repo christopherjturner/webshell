@@ -45,7 +45,7 @@ func main() {
 	mux.HandleFunc(path.Join("/", prefix), termPageHandler)
 	mux.HandleFunc(path.Join("/", prefix, "home"), homeDirHandler)
 	mux.HandleFunc(path.Join("/", prefix, "upload"), uploadFileHandler)
-	mux.HandleFunc(path.Join("/", prefix, "home/{filename}"), getFileHandler)
+	mux.HandleFunc(path.Join("/", prefix, "home/{filename...}"), getFileHandler)
 
 	log.Printf("Listening on 0.0.0.0:%d/%s", config.Port, prefix)
 	log.Printf("Service files form %s", config.HomeDir)

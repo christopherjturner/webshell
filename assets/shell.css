@@ -45,3 +45,15 @@ body {
     width: 100%;
     display: block;
 }
+
+.file-section {
+    padding: 10px;
+    color: #1a1a1a;
+    background: #cecece;
+    margin-bottom: 10px;
+
+}
+
+.file-section a {
+    color: #323232;
+}

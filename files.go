@@ -58,7 +58,8 @@ func homeDirHandler(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if !info.IsDir() && len(filePaths) < MAX_HOME_FILES {
-			filePaths = append(filePaths, filepath.Join(path, info.Name()))
+			relativePath, _ := filepath.Rel(config.HomeDir, path)
+			filePaths = append(filePaths, relativePath)
 		}
 		return nil
 	})
