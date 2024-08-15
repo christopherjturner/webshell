@@ -79,7 +79,6 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	// sanitize input
 	filename := filepath.Clean(r.PathValue("filename"))
 	filename = filepath.Join(config.HomeDir, filename)
-	println(filename)
 	f, err := os.Open(filename)
 	if err != nil {
 		http.Error(w, "File Not Found", 404)
