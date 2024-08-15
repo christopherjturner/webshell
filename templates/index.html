@@ -1,11 +1,11 @@
 <html>
 
 <head>
-  <link rel="stylesheet" href="/assets/shell.css" />
-  <link rel="stylesheet" href="/assets/xterm.min.css" />
-  <script src="/assets/xterm-addon-fit.min.js"></script>
-  <script src="/assets/xterm.min.js"></script>
-  <script src="/assets/addon-attach.min.js"></script>
+  <link rel="stylesheet" href="{{ .Prefix }}/assets/shell.css" />
+  <link rel="stylesheet" href="{{ .Prefix }}/assets/xterm.min.css" />
+  <script src="{{ .Prefix }}/assets/xterm-addon-fit.min.js"></script>
+  <script src="{{ .Prefix }}/assets/xterm.min.js"></script>
+  <script src="{{ .Prefix }}/assets/addon-attach.min.js"></script>
 </head>
 
 <body>
@@ -41,7 +41,7 @@
 
   </div>
 
-  <script src="/assets/main.js"></script>
+  <script src="{{ .Prefix }}/assets/main.js"></script>
   <script type="text/javascript">
     init({{ .ShellUrl }})
     initFilePage()

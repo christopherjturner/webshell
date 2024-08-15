@@ -3,17 +3,17 @@ package main
 import (
 	"embed"
 	"fmt"
+	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
-
-	"golang.org/x/net/websocket"
 )
 
-//go:embed assets/*
+//go:embed static/*
 var assetsFS embed.FS
 
 var config Config
@@ -25,13 +25,12 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", healthHandler)
-	mux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
 
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
 	if config.Token != "" {
 		log.Printf("TOKEN %s", config.Token)
 		//wsHandler = checkKey(config.Token, wsHandler)
-		prefix = url.PathEscape(config.Token)
+		prefix = path.Join("/", url.PathEscape(config.Token))
 	} else {
 		log.Println("No access token set! Anyone with the url can access the shell!")
 	}
@@ -41,11 +40,17 @@ func main() {
 		log.Println("Server will EXIT after the first connection closes")
 	}
 
-	mux.Handle(path.Join("/", prefix, "shell"), wsHandler)
-	mux.HandleFunc(path.Join("/", prefix), termPageHandler)
-	mux.HandleFunc(path.Join("/", prefix, "home"), homeDirHandler)
-	mux.HandleFunc(path.Join("/", prefix, "upload"), uploadFileHandler)
-	mux.HandleFunc(path.Join("/", prefix, "home/{filename...}"), getFileHandler)
+	mux.Handle(path.Join(prefix, "shell"), wsHandler)
+	mux.HandleFunc(path.Join(prefix, "home"), homeDirHandler)
+	mux.HandleFunc(path.Join(prefix, "upload"), uploadFileHandler)
+	mux.HandleFunc(path.Join(prefix, "home/{filename...}"), getFileHandler)
+	mux.HandleFunc(prefix+"/{$}", termPageHandler)
+
+	assetPath := fmt.Sprintf("%s/assets/", prefix)
+	log.Printf("asset path %s", assetPath)
+	//staticAssets := http.StripPrefix(assetPath, http.FileServer(http.Dir("./static/")))
+	staticAssets := http.StripPrefix(assetPath, http.FileServer(http.FS(assetsFS)))
+	mux.Handle(assetPath, staticAssets)
 
 	log.Printf("Listening on 0.0.0.0:%d/%s", config.Port, prefix)
 	log.Printf("Service files form %s", config.HomeDir)
@@ -62,6 +67,19 @@ func main() {
 }
 
 var keyUsed = false
+
+func debugHandler(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upath := r.URL.Path
+		if !strings.HasPrefix(upath, "/") {
+			upath = "/" + upath
+			r.URL.Path = upath
+		}
+		log.Printf("%s serving file from %s", r.URL.Path, path.Clean(upath))
+
+		h.ServeHTTP(w, r)
+	})
+}
 
 func haltOnExit(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
