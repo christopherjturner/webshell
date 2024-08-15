@@ -71,7 +71,6 @@ func homeDirHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getFileHandler(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -91,8 +90,6 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	if _, err := io.Copy(w, f); err != nil {
 		http.Error(w, "Error reading file", 500)
 	}
-
-	return
 }
 
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
