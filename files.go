@@ -21,6 +21,7 @@ var termTemplate = template.Must(template.ParseFS(templateFS, "templates/index.h
 var fileTemplate = template.Must(template.ParseFS(templateFS, "templates/files.html"))
 
 type termPageParams struct {
+	Prefix   string
 	ShellUrl string
 }
 
@@ -30,9 +31,9 @@ func termPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shellUrl := path.Join("/", prefix, "shell")
+	shellUrl := path.Join(prefix, "shell")
 
-	if err := termTemplate.Execute(w, termPageParams{ShellUrl: shellUrl}); err != nil {
+	if err := termTemplate.Execute(w, termPageParams{ShellUrl: shellUrl, Prefix: prefix}); err != nil {
 		log.Println(err)
 		w.WriteHeader(500)
 		return
@@ -70,7 +71,6 @@ func homeDirHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getFileHandler(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -79,7 +79,6 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	// sanitize input
 	filename := filepath.Clean(r.PathValue("filename"))
 	filename = filepath.Join(config.HomeDir, filename)
-	println(filename)
 	f, err := os.Open(filename)
 	if err != nil {
 		http.Error(w, "File Not Found", 404)
@@ -90,8 +89,6 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	if _, err := io.Copy(w, f); err != nil {
 		http.Error(w, "Error reading file", 500)
 	}
-
-	return
 }
 
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {

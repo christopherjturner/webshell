@@ -1,3 +1,7 @@
+FROM golang:1.22 as build
+COPY . .
+RUN CGO_ENABLED=0 go build
+
 FROM debian:bookworm-slim
 
 # Redis CLI and misc os stuff
@@ -23,7 +27,7 @@ RUN curl -s -o mongotools.deb "https://fastdl.mongodb.org/tools/db/mongodb-datab
     dpkg -i mongotools.deb && \
     rm mongotools.deb
 
-COPY cdpshell /usr/bin/cdpshell
+COPY --from=build cdpshell /usr/bin/cdpshell
 
 RUN useradd -ms /bin/bash cdpshell
 USER cdpshell

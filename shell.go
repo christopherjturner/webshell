@@ -123,7 +123,7 @@ func shellHandler(ws *websocket.Conn) {
 			}
 			for _, i := range b[:written] {
 				if i == 13 {
-					log.Printf(string(logBuffer.Bytes()))
+					log.Print(logBuffer.String())
 					logBuffer.Reset()
 					break
 				}
