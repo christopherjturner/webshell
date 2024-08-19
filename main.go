@@ -3,21 +3,20 @@ package main
 import (
 	"embed"
 	"fmt"
-	"golang.org/x/net/websocket"
 	"io/fs"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"time"
+
+	"golang.org/x/net/websocket"
 )
 
 //go:embed assets/*
 var assetsFS embed.FS
 
 var config Config
-var prefix string = ""
+var routes Routes
 
 func main() {
 
@@ -32,11 +31,11 @@ func main() {
 	config = LoadConfigFromEnv()
 	mux := http.NewServeMux()
 
+	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
 	if config.Token != "" {
 		log.Printf("TOKEN %s", config.Token)
 		//wsHandler = checkKey(config.Token, wsHandler)
-		prefix = path.Join("/", url.PathEscape(config.Token))
 	} else {
 		log.Println("No access token set! Anyone with the url can access the shell!")
 	}
@@ -46,19 +45,21 @@ func main() {
 		log.Println("Server will EXIT after the first connection closes")
 	}
 
-	mux.HandleFunc(prefix+"/{$}", termPageHandler)
-	mux.Handle(path.Join(prefix, "shell"), wsHandler)
-	mux.HandleFunc(path.Join(prefix, "home"), homeDirHandler)
-	mux.HandleFunc(path.Join(prefix, "upload"), uploadFileHandler)
-	mux.HandleFunc(path.Join(prefix, "home/{filename...}"), getFileHandler)
+	// routes
+	routes = BuildRoutes(config.Token)
 
-	assetPath := fmt.Sprintf("%s/assets/", prefix)
-	staticAssets := http.StripPrefix(prefix, http.FileServer(http.FS(assetsFS)))
-	mux.Handle(assetPath, staticAssets)
+	mux.HandleFunc(routes.Main, termPageHandler)
+	mux.Handle(routes.Shell, wsHandler)
+	mux.HandleFunc(routes.Home, homeDirHandler)
+	mux.HandleFunc(routes.Upload, uploadFileHandler)
+	mux.HandleFunc(routes.GetFile, getFileHandler)
+
+	staticAssets := http.StripPrefix(routes.Prefix, http.FileServer(http.FS(assetsFS)))
+	mux.Handle(routes.Assets, staticAssets)
 
 	mux.HandleFunc("/health", healthHandler)
 
-	log.Printf("Listening on 0.0.0.0:%d/%s", config.Port, prefix)
+	log.Printf("Listening on 0.0.0.0:%d/%s", config.Port, routes.Prefix)
 	log.Printf("Service files form %s", config.HomeDir)
 
 	s := &http.Server{
@@ -69,10 +70,7 @@ func main() {
 		MaxHeaderBytes: 1 << 20,
 	}
 	log.Fatal(s.ListenAndServe())
-
 }
-
-var keyUsed = false
 
 func debug(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,6 +86,9 @@ func haltOnExit(h http.Handler) http.Handler {
 		os.Exit(0)
 	})
 }
+
+// Has the login token already been used
+var keyUsed = false
 
 func once(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

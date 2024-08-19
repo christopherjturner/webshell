@@ -27,7 +27,7 @@ RUN curl -s -o mongotools.deb "https://fastdl.mongodb.org/tools/db/mongodb-datab
     dpkg -i mongotools.deb && \
     rm mongotools.deb
 
-COPY --from=build cdpshell /usr/bin/cdpshell
+COPY --from=build /go/cdpshell /usr/bin/cdpshell
 
 RUN useradd -ms /bin/bash cdpshell
 USER cdpshell

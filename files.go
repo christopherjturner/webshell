@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -31,9 +30,7 @@ func termPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shellUrl := path.Join(prefix, "shell")
-
-	if err := termTemplate.Execute(w, termPageParams{ShellUrl: shellUrl, Prefix: prefix}); err != nil {
+	if err := termTemplate.Execute(w, termPageParams{ShellUrl: routes.Shell, Prefix: routes.Prefix}); err != nil {
 		log.Println(err)
 		w.WriteHeader(500)
 		return
