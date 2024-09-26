@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -38,7 +37,7 @@ func termPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := termTemplate.Execute(w, termPageParams{Token: config.Token}); err != nil {
-		log.Println(err)
+		logger.Error(fmt.Sprintf("%s", err))
 		w.WriteHeader(500)
 		return
 	}
@@ -67,7 +66,7 @@ func homeDirHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err := fileTemplate.Execute(w, homeDirParams{HomeDir: config.HomeDir, Files: filePaths}); err != nil {
-		log.Println(err)
+		logger.Error(fmt.Sprintf("%s", err))
 	}
 }
 

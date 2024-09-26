@@ -1,10 +1,11 @@
 package main
 
 import (
+	"cdpshell/logging"
 	"embed"
 	"fmt"
-	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -17,16 +18,10 @@ var assetsFS embed.FS
 
 var config Config
 
-func main() {
+var logLevel = new(slog.LevelVar)
+var logger = slog.New(logging.NewHandler(os.Stdout, logLevel))
 
-	// DEBUG: List all the assets baked into the binary
-	fs.WalkDir(assetsFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println(path)
-		return nil
-	})
+func main() {
 
 	config = LoadConfigFromEnv()
 	webshellMux := http.NewServeMux()
@@ -34,10 +29,9 @@ func main() {
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
 
-	// Middleware: Single use token
 	if config.Once {
 		wsHandler = haltOnExit(once(wsHandler))
-		log.Println("Server will EXIT after the first connection closes")
+		logger.Info("Server will EXIT after the first connection closes")
 	}
 
 	// webshell routes
@@ -55,6 +49,7 @@ func main() {
 	// combined routes
 	rootMux := http.NewServeMux()
 
+	// TODO: should we disallow no-token being set and/or randomly generate one?
 	if config.Token == "" {
 		rootMux.Handle("/", webshellMux)
 	} else {
@@ -62,9 +57,8 @@ func main() {
 	}
 	rootMux.Handle("/", systemMux)
 
-	// start the server
-	log.Printf("Listening on 0.0.0.0:%d", config.Port)
-	log.Printf("Service files form %s", config.HomeDir)
+	logger.Info(fmt.Sprintf("Listening on 0.0.0.0:%d", config.Port))
+	logger.Info(fmt.Sprintf("Service files form %s", config.HomeDir))
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf(":%d", config.Port),
@@ -73,16 +67,19 @@ func main() {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+
 	log.Fatal(s.ListenAndServe())
 }
 
+// Middleware to log inbound requests
 func debug(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s", r.URL.Path)
+		logger.Info(r.URL.Path)
 		h.ServeHTTP(w, r)
 	})
 }
 
+// Middleware to stop the process after the webshell disconnects.
 func haltOnExit(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.ServeHTTP(w, r)
@@ -90,7 +87,7 @@ func haltOnExit(h http.Handler) http.Handler {
 	})
 }
 
-// Has the login token already been used
+// Has the login token already been used.
 var keyUsed = false
 
 func once(h http.Handler) http.Handler {
