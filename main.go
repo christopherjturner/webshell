@@ -16,7 +16,6 @@ import (
 var assetsFS embed.FS
 
 var config Config
-var routes Routes
 
 func main() {
 
@@ -30,7 +29,7 @@ func main() {
 	})
 
 	config = LoadConfigFromEnv()
-	mux := http.NewServeMux()
+	webshellMux := http.NewServeMux()
 
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
@@ -41,26 +40,35 @@ func main() {
 		log.Println("Server will EXIT after the first connection closes")
 	}
 
-	// routes
-	routes = BuildRoutes(config.Token)
+	// webshell routes
+	webshellMux.HandleFunc("/{$}", termPageHandler)
+	webshellMux.Handle("/shell", wsHandler)
+	webshellMux.HandleFunc("/home", homeDirHandler)
+	webshellMux.HandleFunc("/upload", uploadFileHandler)
+	webshellMux.HandleFunc("/home/{filename...}", getFileHandler)
+	webshellMux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
 
-	mux.HandleFunc(routes.Main, termPageHandler)
-	mux.Handle(routes.Shell, wsHandler)
-	mux.HandleFunc(routes.Home, homeDirHandler)
-	mux.HandleFunc(routes.Upload, uploadFileHandler)
-	mux.HandleFunc(routes.GetFile, getFileHandler)
+	// system routes
+	systemMux := http.NewServeMux()
+	systemMux.HandleFunc("/health", healthHandler)
 
-	staticAssets := http.StripPrefix(routes.Prefix, http.FileServer(http.FS(assetsFS)))
-	mux.Handle(routes.Assets, staticAssets)
+	// combined routes
+	rootMux := http.NewServeMux()
 
-	mux.HandleFunc("/health", healthHandler)
+	if config.Token == "" {
+		rootMux.Handle("/", webshellMux)
+	} else {
+		rootMux.Handle("/"+config.Token+"/", http.StripPrefix("/"+config.Token, webshellMux))
+	}
+	rootMux.Handle("/", systemMux)
 
-	log.Printf("Listening on 0.0.0.0:%d%s", config.Port, routes.Prefix)
+	// start the server
+	log.Printf("Listening on 0.0.0.0:%d", config.Port)
 	log.Printf("Service files form %s", config.HomeDir)
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf(":%d", config.Port),
-		Handler:        debug(mux),
+		Handler:        debug(rootMux),
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,

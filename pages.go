@@ -22,8 +22,7 @@ var termTemplate = template.Must(template.ParseFS(templateFS, "templates/index.h
 var fileTemplate = template.Must(template.ParseFS(templateFS, "templates/files.html"))
 
 type termPageParams struct {
-	Prefix   string
-	ShellUrl string
+	Token string
 }
 
 type homeDirParams struct {
@@ -38,7 +37,7 @@ func termPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := termTemplate.Execute(w, termPageParams{ShellUrl: routes.Shell, Prefix: routes.Prefix}); err != nil {
+	if err := termTemplate.Execute(w, termPageParams{Token: config.Token}); err != nil {
 		log.Println(err)
 		w.WriteHeader(500)
 		return
