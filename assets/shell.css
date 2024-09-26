@@ -13,23 +13,19 @@ body {
     background: slategray;
 }
 
-
 .tabs-container {
     display: flex;
     flex-wrap: wrap;
 }
 
-/* Remove the > combinator */
 .tabs-container input[type="radio"] {
     display: none;
 }
 
-/* Adjusted adjacent sibling selector */
 .tabs-container input[type="radio"]:checked + .tab-label {
     background-color: slategray;
 }
 
-/* Adjusted adjacent sibling selector */
 .tabs-container input[type="radio"]:not(:checked) + .tab-label + .tab-content {
     display: none;
 }

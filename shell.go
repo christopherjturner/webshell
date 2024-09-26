@@ -92,6 +92,7 @@ func shellHandler(ws *websocket.Conn) {
 
 			b := bytes.Trim(buffer, "\x00")
 
+			// Handle resize message from the terminal.
 			if b[0] == 1 {
 				resizeMessage := bytes.Trim(b[1:], " \n\r\t\x00\x01")
 				ttySize := &TTYSize{}
@@ -116,7 +117,9 @@ func shellHandler(ws *websocket.Conn) {
 				log.Println(err)
 			}
 
-			// log commands entered
+			// Log commands entered
+			// TODO: Test how this handles very large inputs.
+			//       It should probably flush the buffer after a certain size is reached and/or truncate big inputs
 			_, err = logBuffer.Write(b[:written])
 			if err != nil {
 				log.Printf("log buffer error %v", err)

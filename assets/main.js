@@ -9,47 +9,45 @@ function init(shellPath) {
     maximizeWin: true,
     screenReaderMode: true,
     cols: 128,
-      fontFamily: 'Terminal, monospace'
-  });
+    fontFamily: 'Terminal, monospace'
+  })
 
 
 
-  var protocol = (location.protocol === "https:") ? "wss://" : "ws://";
+  var protocol = (location.protocol === "https:") ? "wss://" : "ws://"
   var url = protocol + location.host + shellPath
-  var ws = new WebSocket(url);
-  var attachAddon = new AttachAddon.AttachAddon(ws);
-  var fitAddon = new FitAddon.FitAddon();
+  var ws = new WebSocket(url)
+  var attachAddon = new AttachAddon.AttachAddon(ws)
+  var fitAddon = new FitAddon.FitAddon()
 
-  terminal.loadAddon(attachAddon);
-  terminal.loadAddon(fitAddon);
-  terminal.open(document.getElementById("terminal"));
-  terminal._initialized = true;
+  terminal.loadAddon(attachAddon)
+  terminal.loadAddon(fitAddon)
+  terminal.open(document.getElementById("terminal"))
+  terminal._initialized = true
 
 
   ws.onclose = function(event) {
-    console.log(event);
     terminal.write('\r\n\nconnection has been closed\n')
-  };
+  }
 
   ws.onopen = function() {
 
-    terminal.focus();
-    setTimeout(function() {fitAddon.fit()});
+    terminal.focus()
+    setTimeout(function() {fitAddon.fit()})
 
     terminal.onResize(function(event) {
-        console.log("resizing")
-      var rows = event.rows;
-      var cols = event.cols;
-      var size = JSON.stringify({cols: cols, rows: rows + 1});
-      var send = new TextEncoder().encode("\x01" + size);
-      ws.send(send);
-    });
+      var rows = event.rows
+      var cols = event.cols
+      var size = JSON.stringify({cols: cols, rows: rows + 1})
+      var send = new TextEncoder().encode("\x01" + size)
+      ws.send(send)
+    })
 
     window.onresize = function() {
-      fitAddon.fit();
-    };
-  };
-};
+      fitAddon.fit()
+    }
+  }
+}
 
 function refreshFiles() {
   const div = document.getElementById("files")
@@ -62,36 +60,36 @@ function refreshFiles() {
 }
 
 function initFilePage() {
-// file upload handler
-document.getElementById('uploadForm').addEventListener('submit', function(event) {
-    event.preventDefault()
 
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
+    document.getElementById('uploadForm').addEventListener('submit', function(event) {
+        event.preventDefault()
 
-    if (!file) {
-        return;
-    }
+        const fileInput = document.getElementById('fileInput')
+        const file = fileInput.files[0]
 
-    const formData = new FormData();
-    formData.append('file', file);
-
-    fetch('./upload', {
-        method: 'POST',
-        body: formData,
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok ' + response.statusText);
+        if (!file) {
+            return
         }
-        refreshFiles()
-        fileInput.value = ''
-        return
+
+        const formData = new FormData()
+        formData.append('file', file)
+
+        fetch('./upload', {
+            method: 'POST',
+            body: formData,
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText)
+                }
+                refreshFiles()
+                fileInput.value = ''
+                return
+            })
+            .catch(error => {
+                console.error('Error:', error)
+                fileInput.value = ''
+                alert('File upload failed.')
+            })
     })
-    .catch(error => {
-        console.error('Error:', error);
-        fileInput.value = ''
-        alert('File upload failed.');
-    });
-});
 }

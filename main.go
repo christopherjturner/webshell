@@ -20,6 +20,7 @@ var routes Routes
 
 func main() {
 
+	// DEBUG: List all the assets baked into the binary
 	fs.WalkDir(assetsFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			log.Fatal(err)
@@ -33,13 +34,8 @@ func main() {
 
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
-	if config.Token != "" {
-		log.Printf("TOKEN %s", config.Token)
-		//wsHandler = checkKey(config.Token, wsHandler)
-	} else {
-		log.Println("No access token set! Anyone with the url can access the shell!")
-	}
 
+	// Middleware: Single use token
 	if config.Once {
 		wsHandler = haltOnExit(once(wsHandler))
 		log.Println("Server will EXIT after the first connection closes")
@@ -59,7 +55,7 @@ func main() {
 
 	mux.HandleFunc("/health", healthHandler)
 
-	log.Printf("Listening on 0.0.0.0:%d/%s", config.Port, routes.Prefix)
+	log.Printf("Listening on 0.0.0.0:%d%s", config.Port, routes.Prefix)
 	log.Printf("Service files form %s", config.HomeDir)
 
 	s := &http.Server{
@@ -75,7 +71,6 @@ func main() {
 func debug(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s", r.URL.Path)
-
 		h.ServeHTTP(w, r)
 	})
 }
