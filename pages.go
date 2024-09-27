@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,32 +15,36 @@ const MAX_HOME_FILES int = 100
 
 //go:embed templates/*
 var templateFS embed.FS
+
+// As with assets, templates are embedded in the binary.
 var termTemplate = template.Must(template.ParseFS(templateFS, "templates/index.html"))
 var fileTemplate = template.Must(template.ParseFS(templateFS, "templates/files.html"))
 
 type termPageParams struct {
-	Prefix   string
-	ShellUrl string
+	Token string
 }
 
+type homeDirParams struct {
+	HomeDir string
+	Files   []string
+}
+
+// Handles rendering the main xterm.js page.
 func termPageHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	if err := termTemplate.Execute(w, termPageParams{ShellUrl: routes.Shell, Prefix: routes.Prefix}); err != nil {
-		log.Println(err)
+	if err := termTemplate.Execute(w, termPageParams{Token: config.Token}); err != nil {
+		logger.Error(fmt.Sprintf("%s", err))
 		w.WriteHeader(500)
 		return
 	}
 }
 
-type filePageParams struct {
-	HomeDir string
-	Files   []string
-}
-
+// Handles listing all the files in the container's home dir.
+// TODO: rework this so it only shows one dir deep. Allow for navigation of dir.
 func homeDirHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -62,11 +65,12 @@ func homeDirHandler(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
-	if err := fileTemplate.Execute(w, filePageParams{HomeDir: config.HomeDir, Files: filePaths}); err != nil {
-		log.Println(err)
+	if err := fileTemplate.Execute(w, homeDirParams{HomeDir: config.HomeDir, Files: filePaths}); err != nil {
+		logger.Error(fmt.Sprintf("%s", err))
 	}
 }
 
+// Handles downloading a specific file from the container.
 func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -88,6 +92,7 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Handles uploads by the container.
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

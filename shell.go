@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"sync"
@@ -27,7 +26,7 @@ func shellHandler(ws *websocket.Conn) {
 
 	lb := []byte{}
 	logBuffer := bytes.NewBuffer(lb)
-	log.Println("New session started")
+	logger.Info("New webshell session started")
 	var err error
 
 	cmd := exec.Command(cmd)
@@ -35,7 +34,7 @@ func shellHandler(ws *websocket.Conn) {
 	tty, err := pty.Start(cmd)
 
 	if err != nil {
-		log.Printf("Failed to start shell: %s", err)
+		logger.Error(fmt.Sprintf("Failed to start shell: %s", err))
 		websocket.Message.Send(ws, "Failed to start shell")
 		return
 	}
@@ -44,21 +43,21 @@ func shellHandler(ws *websocket.Conn) {
 	wg.Add(1)
 
 	defer func() {
-		log.Println("Stopping terminal")
+		logger.Info("Stopping terminal")
 		if err := cmd.Process.Kill(); err != nil {
-			log.Printf("failed to stop process: %s", err)
+			logger.Error(fmt.Sprintf("failed to stop process: %s", err))
 		}
 
 		if _, err := cmd.Process.Wait(); err != nil {
-			log.Printf("Failed to wait process: %s", err)
+			logger.Error(fmt.Sprintf("Failed to wait process: %s", err))
 		}
 
 		if err := tty.Close(); err != nil {
-			log.Printf("Failed to close tty: %s", err)
+			logger.Error(fmt.Sprintf("Failed to close tty: %s", err))
 		}
 
 		if err := ws.Close(); err != nil {
-			log.Printf("Failed to close websocket: %s", err)
+			logger.Error(fmt.Sprintf("Failed to close websocket: %s", err))
 		}
 
 	}()
@@ -75,7 +74,7 @@ func shellHandler(ws *websocket.Conn) {
 			}
 
 			if err := websocket.Message.Send(ws, buffer[:l]); err != nil {
-				log.Println("failed to forward tty to ws")
+				logger.Error("failed to forward tty to ws")
 				continue
 			}
 		}
@@ -86,26 +85,27 @@ func shellHandler(ws *websocket.Conn) {
 		buffer := make([]byte, maxBufferSizeBytes)
 		for {
 			if err = websocket.Message.Receive(ws, &buffer); err != nil {
-				fmt.Println("Websocket closed: ", err)
+				logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
 				break
 			}
 
 			b := bytes.Trim(buffer, "\x00")
 
+			// Handle resize message from the terminal.
 			if b[0] == 1 {
 				resizeMessage := bytes.Trim(b[1:], " \n\r\t\x00\x01")
 				ttySize := &TTYSize{}
 
 				if err := json.Unmarshal(resizeMessage, ttySize); err != nil {
-					log.Printf("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err)
+					logger.Warn(fmt.Sprintf("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err))
 					continue
 				}
-				log.Printf("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols)
+				logger.Info("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols)
 				if err := pty.Setsize(tty, &pty.Winsize{
 					Rows: ttySize.Rows,
 					Cols: ttySize.Cols,
 				}); err != nil {
-					log.Printf("failed to resize tty, error: %s", err)
+					logger.Warn(fmt.Sprintf("failed to resize tty, error: %s", err))
 				}
 				continue
 			}
@@ -113,17 +113,19 @@ func shellHandler(ws *websocket.Conn) {
 			// forward to the shell
 			written, err := tty.Write(b)
 			if err != nil {
-				log.Println(err)
+				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 
-			// log commands entered
+			// Log commands entered
+			// TODO: Test how this handles very large inputs.
+			//       It should probably flush the buffer after a certain size is reached and/or truncate big inputs
 			_, err = logBuffer.Write(b[:written])
 			if err != nil {
-				log.Printf("log buffer error %v", err)
+				logger.Error(fmt.Sprintf("log buffer error %s", err))
 			}
 			for _, i := range b[:written] {
 				if i == 13 {
-					log.Print(logBuffer.String())
+					logger.Info(logBuffer.String())
 					logBuffer.Reset()
 					break
 				}
