@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -15,16 +14,12 @@ import (
 
 //go:embed assets/*
 var assetsFS embed.FS
-
 var config Config
-
-var logLevel = new(slog.LevelVar)
-var logger = slog.New(logging.NewHandler(os.Stdout, logLevel))
+var logger = logging.NewEcsLogger()
 
 func main() {
 
 	config = LoadConfigFromEnv()
-	webshellMux := http.NewServeMux()
 
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
@@ -34,7 +29,9 @@ func main() {
 		logger.Info("Server will EXIT after the first connection closes")
 	}
 
-	// webshell routes
+	// Webshell routes.
+	webshellMux := http.NewServeMux()
+
 	webshellMux.HandleFunc("/{$}", termPageHandler)
 	webshellMux.Handle("/shell", wsHandler)
 	webshellMux.HandleFunc("/home", homeDirHandler)
@@ -42,11 +39,11 @@ func main() {
 	webshellMux.HandleFunc("/home/{filename...}", getFileHandler)
 	webshellMux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
 
-	// system routes
+	// System routes.
 	systemMux := http.NewServeMux()
 	systemMux.HandleFunc("/health", healthHandler)
 
-	// combined routes
+	// Combined routes.
 	rootMux := http.NewServeMux()
 
 	// TODO: should we disallow no-token being set and/or randomly generate one?
@@ -62,7 +59,7 @@ func main() {
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf(":%d", config.Port),
-		Handler:        debug(rootMux),
+		Handler:        requestLogger(rootMux),
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
@@ -71,8 +68,8 @@ func main() {
 	log.Fatal(s.ListenAndServe())
 }
 
-// Middleware to log inbound requests
-func debug(h http.Handler) http.Handler {
+// Middleware to log inbound requests.
+func requestLogger(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger.Info(r.URL.Path)
 		h.ServeHTTP(w, r)
@@ -102,6 +99,7 @@ func once(h http.Handler) http.Handler {
 	})
 }
 
+// Minimal healthcheck endpoint.
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }

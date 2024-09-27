@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
 )
 
 const (
@@ -74,3 +75,7 @@ func (x *Handler) WithGroup(name string) slog.Handler {
 	return &Handler{jsonHandler: x.jsonHandler.WithGroup(name)}
 }
 
+func NewEcsLogger() *slog.Logger {
+	var logLevel = new(slog.LevelVar)
+	return slog.New(NewHandler(os.Stdout, logLevel))
+}
