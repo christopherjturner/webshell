@@ -13,7 +13,6 @@ function init(shellPath) {
   })
 
 
-
   var protocol = (location.protocol === "https:") ? "wss://" : "ws://"
   var url = protocol + location.host + shellPath
   var ws = new WebSocket(url)
@@ -47,49 +46,4 @@ function init(shellPath) {
       fitAddon.fit()
     }
   }
-}
-
-function refreshFiles() {
-  const div = document.getElementById("files")
-  const http = new XMLHttpRequest()
-  http.onload = function() {
-    div.innerHTML = http.responseText
-  }
-  http.open("GET", "./home")
-  http.send()
-}
-
-function initFilePage() {
-
-    document.getElementById('uploadForm').addEventListener('submit', function(event) {
-        event.preventDefault()
-
-        const fileInput = document.getElementById('fileInput')
-        const file = fileInput.files[0]
-
-        if (!file) {
-            return
-        }
-
-        const formData = new FormData()
-        formData.append('file', file)
-
-        fetch('./upload', {
-            method: 'POST',
-            body: formData,
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok ' + response.statusText)
-                }
-                refreshFiles()
-                fileInput.value = ''
-                return
-            })
-            .catch(error => {
-                console.error('Error:', error)
-                fileInput.value = ''
-                alert('File upload failed.')
-            })
-    })
 }

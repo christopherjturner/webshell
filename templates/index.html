@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -13,7 +14,7 @@
 
   <div class="tabs-container">
 
-    <input type="radio" id="tab-1" name="tabs" onclick="refreshFiles()" checked>
+    <input type="radio" id="tab-1" name="tabs" checked>
     <label for="tab-1" class="tab-label">
       Terminal
     </label>
@@ -23,21 +24,16 @@
       </div>
     </div>
 
-    <input type="radio" id="tab-2" name="tabs" onclick="refreshFiles()">
+    <input type="radio" id="tab-2" name="tabs">
     <label for="tab-2" class="tab-label">
       Files
     </label>
     <div class="tab-content">
-      <div id="files-border">
-        <div class="file-section" id="upload">
-          <h2>Upload</h2>
-          <form id="uploadForm">
-            <input name="file" type="file" id="fileInput">
-            <button type="submit">Upload</button>
-          </form>
-        </div>
-        <div class="file-section" id="files"></div>
+
+      <div class="file-section" id="files">
+        <iframe src="/{{ .Token }}/home" frameborder="0" id="file-frame"></iframe>
       </div>
+
     </div>
 
   </div>
@@ -45,8 +41,6 @@
   <script src="./assets/main.js"></script>
   <script type="text/javascript">
     init("/{{ .Token }}/shell")
-    initFilePage()
-    refreshFiles()
   </script>
 </body>
 </html>

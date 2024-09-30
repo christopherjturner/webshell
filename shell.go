@@ -30,6 +30,8 @@ func shellHandler(ws *websocket.Conn) {
 	var err error
 
 	cmd := exec.Command(cmd)
+
+	// TODO: check what envs we're actually going to copy here...
 	cmd.Env = os.Environ()
 	tty, err := pty.Start(cmd)
 
@@ -100,7 +102,7 @@ func shellHandler(ws *websocket.Conn) {
 					logger.Warn(fmt.Sprintf("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err))
 					continue
 				}
-				logger.Info("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols)
+				logger.Info(fmt.Sprintf("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols))
 				if err := pty.Setsize(tty, &pty.Winsize{
 					Rows: ttySize.Rows,
 					Cols: ttySize.Cols,
