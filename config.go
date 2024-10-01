@@ -22,7 +22,7 @@ func LoadConfig() Config {
 	homeDir, _ := os.UserHomeDir()
 	flag.StringVar(&cfg.HomeDir, "home", homeDir, "Home directory for file access")
 
-	flag.StringVar(&cfg.Token, "token", "", "Token to access service")
+	flag.StringVar(&cfg.Token, "token", "no-token", "Token to access service")
 	flag.Parse()
 	return cfg
 }

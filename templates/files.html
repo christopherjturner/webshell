@@ -1,7 +1,40 @@
-<h2>{{ .HomeDir }}</h2>
+<!DOCTYPE html>
+<html lang="en">
 
-<ul>
-{{range .Files}}
-  <li><a href="./home/{{ . }}" target="_blank">{{ . }}</a></li>
-{{end}}
-</ul>
+  <head>
+    <link rel="stylesheet" href="{{ .AssetsPath }}/shell.css" />
+    <script>let FF_FOUC_FIX;</script>
+</head>
+
+<body style="margin:0;">
+
+  <div id="files-border">
+
+    <div class="file-section" id="upload">
+      <h2>Upload</h2>
+      <form id="uploadForm" action="{{ .UploadPath }}" method="POST" enctype="multipart/form-data">
+        <input name="file" type="file" id="fileInput">
+        <button type="submit">Upload</button>
+        <span id="error">{{ .Error }}</span>
+      </form>
+    </div>
+
+    <div class="file-section" id="files">
+      <h2>{{ .CurrentDir }}</h2>
+
+      <ul>
+        {{range .Files}}
+        <li>
+          {{ if .IsDir }}
+          <a href="{{ .Path }}" class="dir">{{ .Name }}/</a>
+          {{ else }}
+          <a href="{{ .Path }}" class="file" target="_blank">{{ .Name }}</a>
+          {{ end }}
+        </li>
+        {{end}}
+      </ul>
+    </div>
+
+  </div>
+</body>
+</html>

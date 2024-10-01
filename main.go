@@ -31,28 +31,17 @@ func main() {
 
 	// Webshell routes.
 	webshellMux := http.NewServeMux()
-
 	webshellMux.HandleFunc("/{$}", termPageHandler)
 	webshellMux.Handle("/shell", wsHandler)
-	webshellMux.HandleFunc("/home", homeDirHandler)
+	webshellMux.HandleFunc("/home", getFileHandler)
 	webshellMux.HandleFunc("/upload", uploadFileHandler)
 	webshellMux.HandleFunc("/home/{filename...}", getFileHandler)
 	webshellMux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
 
-	// System routes.
-	systemMux := http.NewServeMux()
-	systemMux.HandleFunc("/health", healthHandler)
-
 	// Combined routes.
 	rootMux := http.NewServeMux()
-
-	// TODO: should we disallow no-token being set and/or randomly generate one?
-	if config.Token == "" {
-		rootMux.Handle("/", webshellMux)
-	} else {
-		rootMux.Handle("/"+config.Token+"/", http.StripPrefix("/"+config.Token, webshellMux))
-	}
-	rootMux.Handle("/", systemMux)
+	rootMux.Handle("/"+config.Token+"/", http.StripPrefix("/"+config.Token, webshellMux))
+	rootMux.HandleFunc("/health", healthHandler)
 
 	logger.Info(fmt.Sprintf("Listening on 0.0.0.0:%d", config.Port))
 	logger.Info(fmt.Sprintf("Service files form %s", config.HomeDir))
