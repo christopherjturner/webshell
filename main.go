@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -15,11 +16,12 @@ import (
 //go:embed assets/*
 var assetsFS embed.FS
 var config Config
-var logger = logging.NewEcsLogger()
+var logger *slog.Logger
 
 func main() {
 
 	config = LoadConfigFromEnv()
+	logger = logging.NewEcsLogger(config.LogLevel)
 
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)

@@ -24,6 +24,13 @@ function init(shellPath) {
   terminal.open(document.getElementById("terminal"))
   terminal._initialized = true
 
+    function ping() {
+      if (ws && ws.readyState === 1) {
+          var msg = new TextEncoder().encode("\x01PING" )
+          ws.send(msg);
+      }
+      setTimeout(ping, 1000);
+    }
 
   ws.onclose = function(event) {
     terminal.write('\r\n\nconnection has been closed\n')
@@ -37,13 +44,17 @@ function init(shellPath) {
     terminal.onResize(function(event) {
       var rows = event.rows
       var cols = event.cols
-      var size = JSON.stringify({cols: cols, rows: rows + 1})
-      var send = new TextEncoder().encode("\x01" + size)
-      ws.send(send)
+      var resize = JSON.stringify({cols: cols, rows: rows + 1})
+      var msg = new TextEncoder().encode("\x01" + resize)
+      ws.send(msg)
     })
+
+    ping()
 
     window.onresize = function() {
       fitAddon.fit()
     }
   }
 }
+
+

@@ -2,15 +2,17 @@ package main
 
 import (
 	"flag"
+	"log/slog"
 	"os"
 	"strconv"
 )
 
 type Config struct {
-	HomeDir string
-	Port    int
-	Once    bool
-	Token   string
+	HomeDir  string
+	Port     int
+	Once     bool
+	Token    string
+	LogLevel *slog.LevelVar
 }
 
 func LoadConfig() Config {
@@ -23,6 +25,12 @@ func LoadConfig() Config {
 	flag.StringVar(&cfg.HomeDir, "home", homeDir, "Home directory for file access")
 
 	flag.StringVar(&cfg.Token, "token", "no-token", "Token to access service")
+
+	cfg.LogLevel = new(slog.LevelVar)
+	if *flag.Bool("debug", false, "Debug level logging") {
+		cfg.LogLevel.Set(slog.LevelDebug)
+	}
+
 	flag.Parse()
 	return cfg
 }

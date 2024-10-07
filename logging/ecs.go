@@ -8,17 +8,13 @@ import (
 )
 
 const (
-	ecsVersion = "8.10.0"
-	logger     = "log/slog"
-)
-
-const (
+	logger        = "log/slog"
+	ecsVersion    = "8.10.0"
 	ecsVersionKey = "ecs.version"
-
-	timestampKey = "@timestamp"
-	messageKey   = "message"
-	logLevelKey  = "log.level"
-	logLoggerKey = "log.logger"
+	timestampKey  = "@timestamp"
+	messageKey    = "message"
+	logLevelKey   = "log.level"
+	logLoggerKey  = "log.logger"
 )
 
 func replacer(groups []string, a slog.Attr) slog.Attr {
@@ -75,7 +71,6 @@ func (x *Handler) WithGroup(name string) slog.Handler {
 	return &Handler{jsonHandler: x.jsonHandler.WithGroup(name)}
 }
 
-func NewEcsLogger() *slog.Logger {
-	var logLevel = new(slog.LevelVar)
+func NewEcsLogger(logLevel *slog.LevelVar) *slog.Logger {
 	return slog.New(NewHandler(os.Stdout, logLevel))
 }

@@ -95,11 +95,17 @@ func shellHandler(ws *websocket.Conn) {
 
 			// Handle resize message from the terminal.
 			if b[0] == 1 {
-				resizeMessage := bytes.Trim(b[1:], " \n\r\t\x00\x01")
+				specialPayload := bytes.Trim(b[1:], " \n\r\t\x00\x01")
+
+				if string(specialPayload) == "PING" {
+					logger.Debug("PING")
+					continue
+				}
+
 				ttySize := &TTYSize{}
 
-				if err := json.Unmarshal(resizeMessage, ttySize); err != nil {
-					logger.Warn(fmt.Sprintf("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err))
+				if err := json.Unmarshal(specialPayload, ttySize); err != nil {
+					logger.Warn(fmt.Sprintf("failed to unmarshal received resize message '%s': %s", string(specialPayload), err))
 					continue
 				}
 				logger.Info(fmt.Sprintf("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols))
