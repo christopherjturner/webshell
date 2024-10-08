@@ -154,14 +154,13 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 	if err := fileTemplate.Execute(w, params); err != nil {
 		logger.Error(fmt.Sprintf("%s", err))
 	}
-	return
 }
 
 // Handles uploads by the container.
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, fmt.Sprintf("Upload Handler: method not allowed: %s", r.Method), http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -195,5 +194,5 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Reload the file page
 	homePath := path.Join("/", config.Token, "/home")
-	http.Redirect(w, r, homePath, 307)
+	http.Redirect(w, r, homePath, http.StatusTemporaryRedirect)
 }

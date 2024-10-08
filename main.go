@@ -62,7 +62,7 @@ func main() {
 // Middleware to log inbound requests.
 func requestLogger(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Info(r.URL.Path)
+		logger.Info(fmt.Sprintf("%s %s", r.Method, r.URL.Path))
 		h.ServeHTTP(w, r)
 	})
 }
