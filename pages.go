@@ -48,7 +48,7 @@ func termPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := termTemplate.Execute(w, termPageParams{Token: config.Token}); err != nil {
 		logger.Error(fmt.Sprintf("%s", err))
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
@@ -154,7 +154,6 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 	if err := fileTemplate.Execute(w, params); err != nil {
 		logger.Error(fmt.Sprintf("%s", err))
 	}
-	return
 }
 
 // Handles uploads by the container.
@@ -195,5 +194,5 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Reload the file page
 	homePath := path.Join("/", config.Token, "/home")
-	http.Redirect(w, r, homePath, 307)
+	http.Redirect(w, r, homePath, http.StatusSeeOther)
 }
