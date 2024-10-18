@@ -1,11 +1,26 @@
+* {
+     box-sizing: border-box;
+}
+
 body {
+    margin: 0;
+    padding: 0;
     font-family: monospace;
     background: #343c44;
 }
 
-#term-border {
-    padding: 10px;
+#terminal {
+    min-height: calc(100vh - 25px);
+    padding-left: 10px;
     background: #000;
+}
+
+.terminal-container{
+    overflow: hidden;
+}
+
+.xterm .xterm-viewport {
+    width: initial !important;
 }
 
 #files-border {
@@ -14,12 +29,12 @@ body {
 }
 
 #file-frame {
-    height: 800px;
+    min-height: 96vh;
     width: 100%;
 }
 
 .dir {
-    color: #black;
+    color: #000;
 }
 
 .tabs-container {
