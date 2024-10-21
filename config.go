@@ -26,12 +26,16 @@ func LoadConfig() Config {
 
 	flag.StringVar(&cfg.Token, "token", "no-token", "Token to access service")
 
+	debug := flag.Bool("debug", false, "Debug level logging")
+
+	flag.Parse()
+
 	cfg.LogLevel = new(slog.LevelVar)
-	if *flag.Bool("debug", false, "Debug level logging") {
+
+	if *debug {
 		cfg.LogLevel.Set(slog.LevelDebug)
 	}
 
-	flag.Parse()
 	return cfg
 }
 

@@ -33,11 +33,15 @@ function init(shellPath) {
     terminal._initialized = true
 
     function ping() {
-        if (ws && ws.readyState === 1) {
-            const msg = new TextEncoder().encode("\x01PING")
-            ws.send(msg);
+        try {
+            if (ws && ws.readyState === 1) {
+                const msg = new TextEncoder().encode("\x01PING")
+                ws.send(msg);
+            }
+        } catch (e) {
+            console.error("ping failed")
         }
-        setTimeout(ping, 1000);
+        setTimeout(ping, 5000);
     }
 
     ws.onclose = function () {
@@ -66,5 +70,4 @@ function init(shellPath) {
         })
     }
 }
-
 
