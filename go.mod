@@ -1,4 +1,4 @@
-module cdpshell
+module webshell
 
 go 1.22
 
