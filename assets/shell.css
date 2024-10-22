@@ -6,7 +6,6 @@ body {
     margin: 0;
     padding: 0;
     font-family: monospace;
-    background: #343c44;
 }
 
 #terminal {
@@ -23,13 +22,8 @@ body {
     width: initial !important;
 }
 
-#files-border {
-    padding: 10px;
-    background: slategray;
-}
-
 #file-frame {
-    min-height: 96vh;
+    min-height: 95vh;
     width: 100%;
 }
 
@@ -47,7 +41,7 @@ body {
 }
 
 .tabs-container input[type="radio"]:checked + .tab-label {
-    background-color: slategray;
+    background-color: #000;
 }
 
 .tabs-container input[type="radio"]:not(:checked) + .tab-label + .tab-content {
@@ -55,25 +49,36 @@ body {
 }
 
 .tab-label {
-    padding: 5px 15px;
+    padding: 10px 15px;
     color: white;
     background-color: darkslategray;
+    font-size: 1.2em;
 }
 
 .tab-content {
     order: 99;
     width: 100%;
     display: block;
+    background-color: #000;
 }
 
 .file-section {
-    padding: 10px;
-    color: #1a1a1a;
+    margin: 10px;
+    color: #323232;
     background: #cecece;
-    margin-bottom: 10px;
-
+    line-height: 1.5;
 }
 
 .file-section a {
     color: #323232;
+}
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }

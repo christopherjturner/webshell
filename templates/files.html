@@ -7,34 +7,32 @@
 </head>
 
 <body style="margin:0;">
+  <div class="file-section" id="upload">
+    <h1>Upload</h1>
+    <form id="uploadForm" action="{{ .UploadPath }}" method="POST" enctype="multipart/form-data">
+      <label class="visually-hidden" for="fileInput">
+        Upload a file
+      </label>
+      <input name="file" type="file" id="fileInput" class="display-block">
+      <button type="submit">Upload</button>
+      <span id="error">{{ .Error }}</span>
+    </form>
+  </div>
 
-  <div id="files-border">
+  <div class="file-section" id="files">
+    <h2>{{ .CurrentDir }}</h2>
 
-    <div class="file-section" id="upload">
-      <h2>Upload</h2>
-      <form id="uploadForm" action="{{ .UploadPath }}" method="POST" enctype="multipart/form-data">
-        <input name="file" type="file" id="fileInput">
-        <button type="submit">Upload</button>
-        <span id="error">{{ .Error }}</span>
-      </form>
-    </div>
-
-    <div class="file-section" id="files">
-      <h2>{{ .CurrentDir }}</h2>
-
-      <ul>
-        {{range .Files}}
-        <li>
-          {{ if .IsDir }}
-          <a href="{{ .Path }}" class="dir">{{ .Name }}/</a>
-          {{ else }}
-          <a href="{{ .Path }}" class="file" target="_blank">{{ .Name }}</a>
-          {{ end }}
-        </li>
-        {{end}}
-      </ul>
-    </div>
-
+    <ul>
+      {{range .Files}}
+      <li>
+        {{ if .IsDir }}
+        <a href="{{ .Path }}" class="dir">{{ .Name }}/</a>
+        {{ else }}
+        <a href="{{ .Path }}" class="file" target="_blank">{{ .Name }}</a>
+        {{ end }}
+      </li>
+      {{end}}
+    </ul>
   </div>
 </body>
 </html>
