@@ -9,8 +9,9 @@ body {
 }
 
 #terminal {
-    min-height: calc(100vh - 25px);
+    min-height: 96vh;
     padding-left: 10px;
+    padding-bottom: 10px;
     background: #000;
 }
 
