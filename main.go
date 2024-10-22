@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cdpshell/logging"
 	"embed"
 	"fmt"
 	"log"
@@ -9,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"webshell/logging"
 
 	"golang.org/x/net/websocket"
 )
@@ -17,11 +17,15 @@ import (
 var assetsFS embed.FS
 var config Config
 var logger *slog.Logger
+var auditLogger *logging.AuditLogger
 
 func main() {
 
 	config = LoadConfigFromEnv()
-	logger = logging.NewEcsLogger(config.LogLevel)
+	logger = logging.NewEcsLogger("terminal", config.LogLevel)
+
+	auditWriter := logging.NewSlogWriter(logging.NewEcsLogger("session", config.LogLevel))
+	auditLogger = logging.NewAuditLogger(auditWriter)
 
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
