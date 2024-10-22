@@ -15,6 +15,8 @@ const (
 	messageKey    = "message"
 	logLevelKey   = "log.level"
 	logLoggerKey  = "log.logger"
+	logKindKey    = "log.kind"
+	sourceKey     = "webshell.source"
 )
 
 func replacer(groups []string, a slog.Attr) slog.Attr {
@@ -27,11 +29,13 @@ func replacer(groups []string, a slog.Attr) slog.Attr {
 }
 
 type Handler struct {
+	source      string
 	jsonHandler slog.Handler
 }
 
-func NewHandler(w io.Writer, logLevel *slog.LevelVar) *Handler {
+func NewHandler(w io.Writer, source string, logLevel *slog.LevelVar) *Handler {
 	return &Handler{
+		source:      source,
 		jsonHandler: slog.NewJSONHandler(w, &slog.HandlerOptions{Level: logLevel, ReplaceAttr: replacer}),
 	}
 }
@@ -59,6 +63,7 @@ func (x *Handler) Handle(ctx context.Context, record slog.Record) error {
 		slog.String(messageKey, record.Message),
 		slog.String(logLevelKey, level),
 		slog.String(ecsVersionKey, ecsVersion),
+		slog.String(sourceKey, x.source),
 	)
 	return x.jsonHandler.Handle(ctx, record)
 }
@@ -71,6 +76,6 @@ func (x *Handler) WithGroup(name string) slog.Handler {
 	return &Handler{jsonHandler: x.jsonHandler.WithGroup(name)}
 }
 
-func NewEcsLogger(logLevel *slog.LevelVar) *slog.Logger {
-	return slog.New(NewHandler(os.Stdout, logLevel))
+func NewEcsLogger(source string, logLevel *slog.LevelVar) *slog.Logger {
+	return slog.New(NewHandler(os.Stdout, source, logLevel))
 }

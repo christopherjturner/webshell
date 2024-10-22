@@ -24,8 +24,6 @@ type TTYSize struct {
 
 func shellHandler(ws *websocket.Conn) {
 
-	lb := []byte{}
-	logBuffer := bytes.NewBuffer(lb)
 	logger.Info("New webshell session started")
 	var err error
 
@@ -97,6 +95,10 @@ func shellHandler(ws *websocket.Conn) {
 			if b[0] == 1 {
 				specialPayload := bytes.Trim(b[1:], " \n\r\t\x00\x01")
 
+				if len(specialPayload) == 0 {
+					continue
+				}
+
 				if string(specialPayload) == "PING" {
 					logger.Debug("PING")
 					continue
@@ -124,21 +126,10 @@ func shellHandler(ws *websocket.Conn) {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 
-			// Log commands entered
-			// TODO: Test how this handles very large inputs.
-			//       It should probably flush the buffer after a certain size is reached and/or truncate big inputs
-			_, err = logBuffer.Write(b[:written])
+			_, err = auditLogger.Write(b[:written])
 			if err != nil {
-				logger.Error(fmt.Sprintf("log buffer error %s", err))
+				logger.Error(fmt.Sprintf("Failed to write to audit log: %s", err))
 			}
-			for _, i := range b[:written] {
-				if i == 13 {
-					logger.Info(logBuffer.String())
-					logBuffer.Reset()
-					break
-				}
-			}
-
 		}
 	}()
 
