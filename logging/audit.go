@@ -25,21 +25,21 @@ func (w *SlogWriter) Write(p []byte) (int, error) {
 
 const bufferSize = 1024 * 16
 
-type AuditLogger struct {
+type AuditWriter struct {
 	buf *bufio.Writer
 	out io.Writer
 }
 
-func NewAuditLogger(w io.Writer) *AuditLogger {
-	return &AuditLogger{
+func NewAuditWriter(w io.Writer) *AuditWriter {
+	return &AuditWriter{
 		buf: bufio.NewWriterSize(w, bufferSize),
 		out: w,
 	}
 }
 
-func (l *AuditLogger) Write(p []byte) (int, error) {
+func (l *AuditWriter) Write(p []byte) (int, error) {
 	n, err := l.buf.Write(p)
-	if l.buf.Buffered() > 0 && bytes.Contains(p, []byte{'\n'}) {
+	if bytes.Contains(p, []byte{0x0D}) {
 		l.buf.Flush()
 	}
 	return n, err

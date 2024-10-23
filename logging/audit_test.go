@@ -9,7 +9,7 @@ import (
 func TestBufferedLogOnlyWritesOnNewLine(t *testing.T) {
 
 	w := strings.Builder{}
-	audit := NewAuditLogger(&w)
+	audit := NewAuditWriter(&w)
 
 	audit.Write([]byte("1"))
 	if w.Len() != 0 {
@@ -26,8 +26,8 @@ func TestBufferedLogOnlyWritesOnNewLine(t *testing.T) {
 		t.Fatalf("w was written to unexpectedly")
 	}
 
-	audit.Write([]byte{'5', '\n'})
-	if w.String() != "12345\n" {
+	audit.Write([]byte{'5', '\r'})
+	if w.String() != "12345\r" {
 		t.Fatalf("w didnt have the expected content [%s]", w.String())
 	}
 }
@@ -35,7 +35,7 @@ func TestBufferedLogOnlyWritesOnNewLine(t *testing.T) {
 func TestBufferedLogWritesWhenBufferIsFull(t *testing.T) {
 
 	w := strings.Builder{}
-	audit := NewAuditLogger(&w)
+	audit := NewAuditWriter(&w)
 
 	input := bytes.Repeat([]byte{'x'}, bufferSize-1)
 

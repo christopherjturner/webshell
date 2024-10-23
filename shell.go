@@ -121,12 +121,12 @@ func shellHandler(ws *websocket.Conn) {
 			}
 
 			// forward to the shell
-			written, err := tty.Write(b)
+			_, err := tty.Write(b)
 			if err != nil {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 
-			_, err = auditLogger.Write(b[:written])
+			_, err = auditWriter.Write(b)
 			if err != nil {
 				logger.Error(fmt.Sprintf("Failed to write to audit log: %s", err))
 			}

@@ -17,15 +17,15 @@ import (
 var assetsFS embed.FS
 var config Config
 var logger *slog.Logger
-var auditLogger *logging.AuditLogger
+var auditWriter *logging.AuditWriter
 
 func main() {
 
 	config = LoadConfigFromEnv()
 	logger = logging.NewEcsLogger("terminal", config.LogLevel)
 
-	auditWriter := logging.NewSlogWriter(logging.NewEcsLogger("session", config.LogLevel))
-	auditLogger = logging.NewAuditLogger(auditWriter)
+	auditLog := logging.NewSlogWriter(logging.NewEcsLogger("session", config.LogLevel))
+	auditWriter = logging.NewAuditWriter(auditLog)
 
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
