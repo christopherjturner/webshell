@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/creack/pty"
 	"golang.org/x/net/websocket"
@@ -26,6 +28,20 @@ func shellHandler(ws *websocket.Conn) {
 
 	logger.Info("New webshell session started")
 	var err error
+
+	// TODO: Package all the audit writer stuff up
+	auditFile, err := os.Create("audit.bin")
+	if err != nil {
+		panic(err) // TODO: handle better
+	}
+
+	var auditWritten int64
+	timingFile, err := os.Create("timings.bin")
+	if err != nil {
+		panic(err)
+	}
+
+	// END OF TODO:
 
 	cmd := exec.Command(cmd)
 
@@ -59,12 +75,15 @@ func shellHandler(ws *websocket.Conn) {
 		if err := ws.Close(); err != nil {
 			logger.Error(fmt.Sprintf("Failed to close websocket: %s", err))
 		}
-
+		auditFile.Close()
+		timingFile.Close()
 	}()
 
 	// TTY to WS
 	go func() {
 		buffer := make([]byte, maxBufferSizeBytes)
+		lastTimestamp := time.Now().UnixMilli()
+
 		for {
 			l, err := tty.Read(buffer)
 			if err != nil {
@@ -77,6 +96,23 @@ func shellHandler(ws *websocket.Conn) {
 				logger.Error("failed to forward tty to ws")
 				continue
 			}
+
+			n, err := auditFile.Write(buffer[:l])
+			if err != nil {
+				logger.Error("failed to write to audit log")
+				// TODO: do we hard-fail here?
+			}
+
+			// record timings (100ms precision)
+			timestamp := time.Now().UnixMilli()
+			if (timestamp - lastTimestamp) > 100 {
+				lastTimestamp = timestamp
+				fmt.Printf("AUDIT: %d offset %d second\n", auditWritten, timestamp)
+				binary.Write(timingFile, binary.LittleEndian, auditWritten)
+				binary.Write(timingFile, binary.LittleEndian, timestamp)
+			}
+			auditWritten += int64(n)
+
 		}
 	}()
 
@@ -126,6 +162,7 @@ func shellHandler(ws *websocket.Conn) {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 
+			// write to audit file
 			_, err = auditWriter.Write(b)
 			if err != nil {
 				logger.Error(fmt.Sprintf("Failed to write to audit log: %s", err))

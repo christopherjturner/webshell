@@ -29,7 +29,7 @@ func main() {
 
 	// Add middleware to websocket handler
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
-
+	wsReplayHandler := websocket.Handler(replayHandler)
 	if config.Once {
 		wsHandler = haltOnExit(once(wsHandler))
 		logger.Info("Server will EXIT after the first connection closes")
@@ -39,6 +39,8 @@ func main() {
 	webshellMux := http.NewServeMux()
 	webshellMux.HandleFunc("/{$}", termPageHandler)
 	webshellMux.Handle("/shell", wsHandler)
+	webshellMux.HandleFunc("/replay", replayPageHandler)
+	webshellMux.Handle("/replay/ws", wsReplayHandler)
 	webshellMux.HandleFunc("/home", getFileHandler)
 	webshellMux.HandleFunc("/upload", uploadFileHandler)
 	webshellMux.HandleFunc("/home/{filename...}", getFileHandler)
@@ -47,6 +49,7 @@ func main() {
 	// Combined routes.
 	rootMux := http.NewServeMux()
 	rootMux.Handle("/"+config.Token+"/", http.StripPrefix("/"+config.Token, webshellMux))
+
 	rootMux.HandleFunc("/health", healthHandler)
 
 	logger.Info(fmt.Sprintf("Listening on 0.0.0.0:%d", config.Port))

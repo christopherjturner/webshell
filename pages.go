@@ -17,8 +17,9 @@ var templateFS embed.FS
 
 // As with assets, templates are embedded in the binary.
 var (
-	termTemplate = template.Must(template.ParseFS(templateFS, "templates/index.html"))
-	fileTemplate = template.Must(template.ParseFS(templateFS, "templates/files.html"))
+	termTemplate   = template.Must(template.ParseFS(templateFS, "templates/index.html"))
+	replayTemplate = template.Must(template.ParseFS(templateFS, "templates/replay.html"))
+	fileTemplate   = template.Must(template.ParseFS(templateFS, "templates/files.html"))
 )
 
 type termPageParams struct {
@@ -47,6 +48,19 @@ func termPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := termTemplate.Execute(w, termPageParams{Token: config.Token}); err != nil {
+		logger.Error(fmt.Sprintf("%s", err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func replayPageHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := replayTemplate.Execute(w, termPageParams{Token: config.Token}); err != nil {
 		logger.Error(fmt.Sprintf("%s", err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
