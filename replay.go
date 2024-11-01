@@ -1,14 +1,11 @@
 package main
 
 import (
-	"encoding/binary"
+	"bytes"
 	"fmt"
-	"io"
-	"os"
-	"sync"
-	"time"
-
 	"golang.org/x/net/websocket"
+	"sync"
+	"webshell/ttyrec"
 )
 
 func replayHandler(ws *websocket.Conn) {
@@ -16,19 +13,15 @@ func replayHandler(ws *websocket.Conn) {
 	logger.Info("Replaying session")
 	var err error
 
-	auditFile, err := os.Open("audit.bin")
+	replayer, err := ttyrec.NewReplayer("ttyrec.bin")
 	if err != nil {
-		panic(err) // TODO: handle better
-	}
-
-	timings, err := loadTimings("timings.bin")
-	if err != nil {
-		panic(err)
+		logger.Error(fmt.Sprintf("failed to load audit file: %v", err))
+		return
 	}
 
 	defer func() {
 		logger.Info("Stopping terminal")
-		auditFile.Close()
+		replayer.Close()
 	}()
 
 	var wg sync.WaitGroup
@@ -36,28 +29,44 @@ func replayHandler(ws *websocket.Conn) {
 
 	wsWriter := WsWriter{ws: ws}
 
-	// TTY to WS
+	// temp
 	go func() {
+		replayer.Play(wsWriter)
+	}()
 
-		var offset int64
-		var lastTime int64
-
-		for i := 0; i < len(timings); i++ {
-			toCopy := int64(timings[i].Offset - offset)
-
-			io.CopyN(wsWriter, auditFile, toCopy)
-			fmt.Printf("writing %d->%d\n", offset, timings[i].Offset)
-			offset = timings[i].Offset
-
-			if lastTime == 0 {
-				lastTime = timings[i].Time
+	go func() {
+		buffer := make([]byte, maxBufferSizeBytes)
+		for {
+			if err = websocket.Message.Receive(ws, &buffer); err != nil {
+				logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
+				break
 			}
-			sleepFor := time.Duration(timings[i].Time - lastTime)
-			fmt.Printf("sleeping %d\n", sleepFor)
-			time.Sleep(sleepFor * time.Millisecond)
-			lastTime = timings[i].Time
+
+			b := bytes.Trim(buffer, "\x00")
+
+			// Handle resize message from the terminal.
+			if b[0] == 1 {
+
+				specialPayload := bytes.Trim(b[1:], " \n\r\t\x00\x01")
+				logger.Info(string(specialPayload))
+				if len(specialPayload) == 0 {
+					continue
+				}
+
+				if string(specialPayload) == "PING" {
+					logger.Debug("PING")
+					continue
+				}
+
+				if string(specialPayload) == "PLAY" {
+					go func() {
+						replayer.Play(wsWriter)
+					}()
+					continue
+				}
+			}
 		}
-		io.Copy(wsWriter, auditFile)
+
 	}()
 
 	wg.Wait()
@@ -73,77 +82,4 @@ func (w WsWriter) Write(b []byte) (int, error) {
 		return 0, err
 	}
 	return len(b), err
-}
-
-func loadTimings(filePath string) ([]Timing, error) {
-	timings := []Timing{}
-
-	f, err := os.Open(filePath)
-	if err != nil {
-		return []Timing{}, err
-	}
-	defer f.Close()
-
-	for {
-		var offset int64
-		var timestamp int64
-
-		err := binary.Read(f, binary.LittleEndian, &offset)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, fmt.Errorf("error reading from file: %v", err)
-		}
-
-		err = binary.Read(f, binary.LittleEndian, &timestamp)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, fmt.Errorf("error reading from file: %v", err)
-		}
-
-		// Append the value to the slice
-		timings = append(timings, Timing{offset, timestamp})
-	}
-
-	return timings, nil
-
-}
-
-type Timing struct {
-	Offset int64
-	Time   int64
-}
-
-type AuditReplayer struct {
-	File    *os.File
-	Timings []Timing
-}
-
-func NewAuditReplayer() *AuditReplayer {
-
-	return &AuditReplayer{}
-}
-
-func (a *AuditReplayer) Play(w io.Writer) {
-	var offset int64
-	var lastTime int64
-
-	for i := 0; i < len(a.Timings); i++ {
-		toCopy := int64(a.Timings[i].Offset - offset)
-
-		io.CopyN(w, a.File, toCopy)
-		offset = a.Timings[i].Offset
-
-		if lastTime == 0 {
-			lastTime = a.Timings[i].Time
-		}
-		sleepFor := time.Duration(a.Timings[i].Time - lastTime)
-		fmt.Printf("sleeping %d\n", sleepFor)
-		time.Sleep(sleepFor * time.Millisecond)
-		lastTime = a.Timings[i].Time
-	}
-	io.Copy(w, a.File)
 }

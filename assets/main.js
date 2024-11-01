@@ -1,4 +1,5 @@
 let terminal
+let ws
 
 function debounce(func, timeout = 300) {
     let timer;
@@ -23,7 +24,7 @@ function init(shellPath) {
 
     const protocol = (location.protocol === "https:") ? "wss://" : "ws://"
     const url = protocol + location.host + shellPath
-    const ws = new WebSocket(url)
+    ws = new WebSocket(url)
     const attachAddon = new AttachAddon.AttachAddon(ws)
     const fitAddon = new FitAddon.FitAddon()
 
