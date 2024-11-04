@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/creack/pty"
 	"golang.org/x/net/websocket"
 
+	"webshell/strace"
 	"webshell/ttyrec"
 )
 
@@ -50,6 +52,14 @@ func shellHandler(ws *websocket.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	straceAudit := strace.NewStraceLogger(auditLogger)
+
+	err = straceAudit.Attach(cmd.Process.Pid)
+	if err != nil {
+		// TODO: handle this better
+		panic(err)
+	}
+
 	defer func() {
 		logger.Info("Stopping terminal")
 		if err := cmd.Process.Kill(); err != nil {
@@ -72,6 +82,7 @@ func shellHandler(ws *websocket.Conn) {
 		if err := recorder.Save("ttyrec.bin"); err != nil {
 			logger.Error(fmt.Sprintf("Failed to save ttyrec: %s", err))
 		}
+
 		recorder.Close()
 
 	}()
@@ -144,12 +155,6 @@ func shellHandler(ws *websocket.Conn) {
 			_, err := tty.Write(b)
 			if err != nil {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
-			}
-
-			// log user input
-			_, err = auditWriter.Write(b)
-			if err != nil {
-				logger.Error(fmt.Sprintf("Failed to write to audit log: %s", err))
 			}
 		}
 	}()

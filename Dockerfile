@@ -6,7 +6,7 @@ FROM debian:bookworm-slim
 
 # Redis CLI and misc os stuff
 RUN apt update && \
-    apt install -y curl wget unzip redis-tools less && \
+    apt install -y curl strace wget unzip redis-tools less && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 

@@ -1,54 +1,70 @@
 # Auditing
 
-Idea:
+Auditing consists of two parts:
 
-In the shell handler:
-- Create a new append file
-- On the TTY -> WS handler, write all bytes down to the file
-- Also record the timing. This doesn't have to be super precise
-  - timestamp (int64 value) -> offset in file
-  - defer the writing of the file
+1. Exec auditing. All commands run by the user is logged.
+2. TTY auding. Everything the user sees in the terminal is recorded.
 
-File Format
+## Exec Auditing
 
-The tty log is made up of three sections:
+This is implmented using `strace`.
+When a user connects to the webshell, webshell launches `/bin/bash` and pipes the down the websocket.
+After bash is launched, strace is run attaching to the PID of the bash instance.
+Stderr from strace is sent to a reader that filters out only `execve` calls and writes the output to the audit logger.
 
-- Header
-- Audit Data
-- Timing Data
+If strace is not installed then exec level auditing will be disabled.
+Going forward we might want to look at implementing the syscall based auditing in pure go using ptrace.
 
-## Header
 
-The header describes the layout of the file.
-The header should be read fully before paring the rest of the file.
-The locations of the audit and timing section are described in the header.
-The compression section describes if either of these sections are compressed, and if so with what alogrithm.
+## TTY Recording
 
-Magic       2 byte          - always 0xCE 0x92
-Version     4 byte          - always 0 (uint32)
-Compression 2 bytes         - 0x00 no compressions 0x01 gzip. byte 1 = audit section byte 2 = timings section
-Timestamp   8 byte (int64)  - unix timestamp when log was started
-AuditStart  8 byte (int64)  - length of audit data section in bytes
-AuditSize   8 byte (int64)  - length of audit data section in bytes
-TimingStart 8 byte (int64)  - offset of the timing section
-TimingSize  8 byte (int64)  - offset of the timing section
+This keeps a copy of every byte sent to the user's xterm.js terminal along with a timeline of when this data was sent.
+At the end of the users session these files are uploaded to S3.
 
-TODO: maybe record the timing precision if we make it configurable?
+The TTY Recordings can be later played back via the webshell (see: /replay endpoint).
 
-## Audit Data
+TTY Recording creates two temporary files while the user's session is in progress.
 
-The audit data section contains a raw copy of all the audit data sent to the webshell from the terminal.
-It is replayed via websockets to an instance of xterm.js to show exactly what the user would have seen.
+- `ttyrec.data` the raw output of tty session
+- `ttyrec.time` the times at which the tty writes happened
 
-## Timing Data
+At the end of the session these files are merged into a single file.
 
-Timing data consists of pairs of 16 bytes.
+### TTY Recording (ttyrec) File Format
 
-Offset 8 bytes (int64)
-Time   8 bytes (int64)
+The ttyrec has three parts:
 
-Timing data is precise to 100ms (TBC this may be configurable), meaning a new entry is created at most once every 100ms.
-The offset value points at the location in the audit data the event occured.
-Offset values are relative to the start of the audit data section (AuditStart + Offset).
-If the audit data is compressed then the offset will be a pointer to the uncompressed version of the data.
+1. Header      - Fixed size with data about how to access the rest of the file
+2. Audit Data  - Holds the raw tty output
+3. Timing Data - Hold the data about output was written to the terminal
+
+### Header
+
+The header is a fixed sized binary structure.
+It consists of the following fields:
+
+Magic        4 byte (uint32) - always set to 0xDC3443CD
+Version      1 byte          - always 1 (uint32)
+Compression  2 byte          - what compression is used. 0=None, 1=gzip. first byte is audit, 2nd timing data
+Flags        1 byte          - bitfield of flags. (unused)
+AuditOfset   8 byte (int64)  - offset of audit data from the start of the file.
+AuditLength  8 byte (int64)  - length of audit data section in bytes
+TimingOffset 8 byte (int64)  - offset of audit data from the start of the file.
+TimingSize   8 byte (int64)  - length of the timing section in bytes.
+
+### Audit Data
+Audit data is the raw TTY output. Its copied from the pseudo-terminal at the same point its written to the websocket. The raw data can be replayed by sending it down the websocket to an attached xterm.js
+
+### Timing Data
+
+Timing data is used to play back the TTY output at roughly the same speed it was displayed.
+
+Time        8 bytes (int64) - Unix time in milliseconds
+Offset      8 bytes (int64) - Offset position in the audit data that the event occured
+
+To keep the size of the timing data down it is updated no more than once every 100ms.
+
+### Future Work
+Add an extra section to annoate timings with data from the Exec Audit.
+Some sort of checksum/signing?
 
