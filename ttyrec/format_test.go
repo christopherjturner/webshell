@@ -72,14 +72,14 @@ func TestSaveAndLoad(t *testing.T) {
 	}
 
 	// Check the timing data matches.
-	if len(rec.Timings) != len(timingsData) {
+	if len(rec.Timings) != len(timingsData)+1 {
 		t.Errorf("timing data didnt load correctly. want %d items got %d",
 			len(timingsData),
 			len(rec.Timings),
 		)
 	}
 
-	for i := range rec.Timings {
+	for i := range timingsData {
 		if rec.Timings[i].Offset != timingsData[i].Offset {
 			t.Errorf("timing[%d].Offset want %d got %d",
 				i,

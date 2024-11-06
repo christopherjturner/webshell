@@ -47,6 +47,7 @@ func termPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("Token is being set to %s\n", config.Token)
 	if err := termTemplate.Execute(w, termPageParams{Token: config.Token}); err != nil {
 		logger.Error(fmt.Sprintf("%s", err))
 		w.WriteHeader(http.StatusInternalServerError)

@@ -7,6 +7,7 @@ import (
 var valid = []string{
 	`[pid 3702590] 1730503723.010946 execve("/usr/bin/whoami", ["whoami"], 0x5601036f6790 /* 52 vars */) = 0`,
 	`[pid 306753] 1730709070.467006 execve("/usr/bin/ls", ["ls", "--color=auto", "/home/chris/code/go/", "-adfg", "-g"], 0x557bf130cb90 /* 53 vars */) = 0`,
+	`[pid    17] 1730823571.031830 execve("/usr/bin/ls", ["ls", "-la"], 0x557237896740 /* 7 vars */) = 0`,
 }
 
 var invalid = []string{

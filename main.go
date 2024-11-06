@@ -39,8 +39,13 @@ func main() {
 	webshellMux := http.NewServeMux()
 	webshellMux.HandleFunc("/{$}", termPageHandler)
 	webshellMux.Handle("/shell", wsHandler)
-	webshellMux.HandleFunc("/replay", replayPageHandler)
-	webshellMux.Handle("/replay/ws", wsReplayHandler)
+
+	// Playback of audit files. Still a work in progress
+	if config.Replay {
+		webshellMux.HandleFunc("/replay", replayPageHandler)
+		webshellMux.Handle("/replay/ws", wsReplayHandler)
+	}
+
 	webshellMux.HandleFunc("/home", getFileHandler)
 	webshellMux.HandleFunc("/upload", uploadFileHandler)
 	webshellMux.HandleFunc("/home/{filename...}", getFileHandler)

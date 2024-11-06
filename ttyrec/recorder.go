@@ -2,9 +2,16 @@ package ttyrec
 
 import (
 	"encoding/binary"
+	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
+
+type TTYRecorder interface {
+	io.WriteCloser
+	Save() error
+}
 
 type Recorder struct {
 	ttyFile   *os.File
@@ -12,16 +19,24 @@ type Recorder struct {
 	lastWrite int64
 	offset    int
 	precision int64
-	active    bool
+	enabled   bool
+	auditDir  string
+	auditFile string
 }
 
-func NewRecorder() (*Recorder, error) {
-	ttyFile, err := os.Create("ttyrec.data")
+func NewRecorder(auditDir, auditFile string) (*Recorder, error) {
+
+	err := os.MkdirAll(auditDir, 0600)
 	if err != nil {
 		return nil, err
 	}
 
-	timeFile, err := os.Create("ttyrec.time")
+	ttyFile, err := os.CreateTemp(auditDir, "ttyrec.data")
+	if err != nil {
+		return nil, err
+	}
+
+	timeFile, err := os.CreateTemp(auditDir, "ttyrec.time")
 	if err != nil {
 		return nil, err
 	}
@@ -30,28 +45,36 @@ func NewRecorder() (*Recorder, error) {
 		ttyFile:   ttyFile,
 		timeFile:  timeFile,
 		precision: 100,
-		active:    true,
+		enabled:   true,
+		auditDir:  auditDir,
+		auditFile: auditFile,
 	}
 
 	return rec, nil
 }
 
-func (r *Recorder) Save(filepath string) error {
+func (r *Recorder) Save() error {
 
-	outfile, err := os.Create(filepath)
+	outfile, err := os.Create(filepath.Join(r.auditDir, r.auditFile))
 	if err != nil {
 		return err
 	}
 
-	r.active = false
+	r.enabled = false
 
-	r.ttyFile.Sync()
-	r.timeFile.Sync()
+	ttyFile, err := os.Open(r.ttyFile.Name())
+	if err != nil {
+		return err
+	}
+	defer ttyFile.Close()
 
-	r.ttyFile.Seek(0, 0)
-	r.timeFile.Seek(0, 0)
+	timeFile, err := os.Open(r.timeFile.Name())
+	if err != nil {
+		return err
+	}
+	defer timeFile.Close()
 
-	return Save(outfile, r.ttyFile, r.timeFile)
+	return Save(outfile, ttyFile, timeFile)
 }
 
 func (r Recorder) Close() error {
@@ -70,7 +93,7 @@ func (r Recorder) Close() error {
 
 func (r *Recorder) Write(b []byte) (int, error) {
 
-	if !r.active {
+	if !r.enabled {
 		return 0, nil
 	}
 
@@ -102,4 +125,18 @@ func (r *Recorder) Write(b []byte) (int, error) {
 
 	r.offset += n
 	return n, nil
+}
+
+type NoOpRecorder struct{}
+
+func (r *NoOpRecorder) Write(b []byte) (int, error) {
+	return len(b), nil
+}
+
+func (r *NoOpRecorder) Save() error {
+	return nil
+}
+
+func (r NoOpRecorder) Close() error {
+	return nil
 }

@@ -1,53 +1,0 @@
-[?2004h[38;5;4mchris[m(B[38;5;9m@[m(B[m(B[38;5;10mT14s[m(B ~/code/go/cdp-webshell [m(B[38;5;9m$[m(B [m(B[K[38;5;4mchris[m(B[38;5;9m@[m(B[m(B[38;5;10mT14s[m(B ~/code/go/cdp-webshell [m(B[38;5;9m$[m(B [m(Bls -la
-[?2004ltotal 11180
-drwxr-xr-x. 1 chris chris      376 Oct 28 10:38  [0m[38;5;4m.[0m
-drwxr-xr-x. 1 chris chris      610 Oct 22 14:10  [38;5;4m..[0m
-drwxr-xr-x. 1 chris chris      164 Oct 21 10:23  [38;5;4massets[0m
--rw-r--r--. 1 chris chris      260 Oct 28 11:56  [0maudit.bin[0m
--rw-r--r--. 1 chris chris     1998 Oct 28 10:37  [0mauditing.md[0m
--rw-r--r--. 1 chris chris     1066 Oct 21 10:08  [0mconfig.go[0m
--rw-r--r--. 1 chris chris      981 Oct 22 14:12  [0mDockerfile[0m
--rw-r--r--. 1 chris chris      147 Oct 21 09:58  [0m.editorconfig[0m
-drwxr-xr-x. 1 chris chris      204 Oct 28 10:38  [38;5;4m.git[0m
--rw-r--r--. 1 chris chris        9 Oct 23 11:28  [0m.gitignore[0m
--rw-r--r--. 1 chris chris      119 Oct 22 14:12  [0mgo.mod[0m
--rw-r--r--. 1 chris chris      316 Jun 10 08:20  [0mgo.sum[0m
-drwxr-xr-x. 1 chris chris       54 Oct 23 11:27  [38;5;4mlogging[0m
--rw-r--r--. 1 chris chris     2702 Oct 28 08:52  [0mmain.go[0m
--rw-r--r--. 1 chris chris     5100 Oct 28 08:49  [0mpages.go[0m
--rw-r--r--. 1 chris chris      303 Oct 21 09:58  [38;5;4;1mREADME.md[0m
--rw-r--r--. 1 chris chris     2279 Oct 28 08:48 [0m'#replay.go#'[0m
-lrwxrwxrwx. 1 chris chris       29 Oct 28 08:47  [48;5;196;38;5;232;1m.#replay.go[0m -> [48;5;196;38;5;232;1mchris@T14s.3006238:1727075155[0m
--rw-r--r--. 1 chris chris     2253 Oct 27 18:44  [0mreplay.go[0m
--rw-r--r--. 1 chris chris     3908 Oct 27 18:34  [0mshell.go[0m
-drwxr-xr-x. 1 chris chris        0 Aug 15 16:13  [38;5;4mstatic[0m
-drwxr-xr-x. 1 chris chris       62 Oct 28 10:39  [38;5;4mtemplates[0m
--rw-r--r--. 1 chris chris      112 Oct 28 11:56  [0mtimings.bin[0m
--rwxr-xr-x. 1 chris chris 11373135 Oct 28 10:38  [38;5;10mwebshell[0m
-[?2004h[38;5;4mchris[m(B[38;5;9m@[m(B[m(B[38;5;10mT14s[m(B ~/code/go/cdp-webshell [m(B[38;5;9m$[m(B [m(Bhexde[Kump -C tim,[Kings.bin 
-[?2004l00000000  00 00 00 00 00 00 00 00  ac 6c fc d2 92 01 00 00  |.........l......|
-00000010  f3 00 00 00 00 00 00 00  ff 71 fc d2 92 01 00 00  |.........q......|
-00000020  f4 00 00 00 00 00 00 00  6c 72 fc d2 92 01 00 00  |........lr......|
-00000030  f6 00 00 00 00 00 00 00  16 73 fc d2 92 01 00 00  |.........s......|
-00000040  f7 00 00 00 00 00 00 00  4a 76 fc d2 92 01 00 00  |........Jv......|
-00000050  f8 00 00 00 00 00 00 00  69 77 fc d2 92 01 00 00  |........iw......|
-00000060  f9 00 00 00 00 00 00 00  f9 7a fc d2 92 01 00 00  |.........z......|
-00000070  55 08 00 00 00 00 00 00  81 80 fc d2 92 01 00 00  |U...............|
-00000080  57 08 00 00 00 00 00 00  58 81 fc d2 92 01 00 00  |W.......X.......|
-00000090  58 08 00 00 00 00 00 00  a1 82 fc d2 92 01 00 00  |X...............|
-000000a0  59 08 00 00 00 00 00 00  3e 83 fc d2 92 01 00 00  |Y.......>.......|
-000000b0  5a 08 00 00 00 00 00 00  b8 84 fc d2 92 01 00 00  |Z...............|
-000000c0  5e 08 00 00 00 00 00 00  a3 85 fc d2 92 01 00 00  |^...............|
-000000d0  5f 08 00 00 00 00 00 00  24 86 fc d2 92 01 00 00  |_.......$.......|
-000000e0  62 08 00 00 00 00 00 00  45 87 fc d2 92 01 00 00  |b.......E.......|
-000000f0  63 08 00 00 00 00 00 00  9d 88 fc d2 92 01 00 00  |c...............|
-00000100  65 08 00 00 00 00 00 00  0c 8e fc d2 92 01 00 00  |e...............|
-00000110  67 08 00 00 00 00 00 00  06 8f fc d2 92 01 00 00  |g...............|
-00000120  69 08 00 00 00 00 00 00  17 91 fc d2 92 01 00 00  |i...............|
-00000130  6d 08 00 00 00 00 00 00  b5 91 fc d2 92 01 00 00  |m...............|
-00000140  76 08 00 00 00 00 00 00  ba 93 fc d2 92 01 00 00  |v...............|
-00000150
-[?2004h[38;5;4mchris[m(B[38;5;9m@[m(B[m(B[38;5;10mT14s[m(B ~/code/go/cdp-webshell [m(B[38;5;9m$[m(B [m(Bwhoami
-[?2004lchris
-[?2004h[38;5;4mchris[m(B[38;5;9m@[m(B[m(B[38;5;10mT14s[m(B ~/code/go/cdp-webshell [m(B[38;5;9m$[m(B [m(Bexit
-[?2004lexit

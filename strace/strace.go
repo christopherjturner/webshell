@@ -17,7 +17,7 @@ var (
 	errIgnoredMessage   = errors.New("ignored message")
 	errInvalidTimestamp = errors.New("invalid timestamp")
 
-	execveRx = regexp.MustCompile(`^\[pid (\d+)\]\s+([\d\.]+)\s+execve\((.+)\) = \d+`)
+	execveRx = regexp.MustCompile(`^\[pid\s+(\d+)\]\s+([\d\.]+)\s+execve\((.+)\)\s+=\s+\d+`)
 )
 
 type StraceExecve struct {
@@ -31,7 +31,7 @@ func filter(s string) bool {
 }
 
 func parse(s string) (StraceExecve, error) {
-
+	println(s)
 	res := StraceExecve{}
 	m := execveRx.FindStringSubmatch(s)
 	if m == nil {
@@ -99,7 +99,6 @@ func (s *StraceLogger) Attach(pid int) error {
 }
 
 func (s *StraceLogger) Write(p []byte) (int, error) {
-
 	for _, b := range p {
 		s.buf.WriteByte(b)
 		if b == '\n' {
