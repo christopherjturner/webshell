@@ -29,7 +29,6 @@ func main() {
 
 	// Add middleware to websocket handler.
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
-	wsReplayHandler := websocket.Handler(replayHandler)
 	if config.Once {
 		wsHandler = haltOnExit(once(wsHandler))
 		logger.Info("Server will EXIT after the first connection closes")
@@ -42,8 +41,9 @@ func main() {
 
 	// Playback of audit files. Still a work in progress
 	if config.Replay {
-		webshellMux.HandleFunc("/replay", replayPageHandler)
+		wsReplayHandler := websocket.Handler(replayHandler)
 		webshellMux.Handle("/replay/ws", wsReplayHandler)
+		webshellMux.HandleFunc("/replay", replayPageHandler)
 	}
 
 	webshellMux.HandleFunc("/home", getFileHandler)

@@ -13,7 +13,7 @@ func replayHandler(ws *websocket.Conn) {
 	logger.Info("Replaying session")
 	var err error
 
-	replayer, err := ttyrec.NewReplayer("ttyrec.bin")
+	replayer, err := ttyrec.NewReplayer(config.ReplayFile)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to load audit file: %v", err))
 		return

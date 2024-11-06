@@ -9,16 +9,17 @@ import (
 )
 
 type Config struct {
-	HomeDir   string
-	Port      int
-	Once      bool
-	Token     string
-	LogLevel  *slog.LevelVar
-	User      *user.User
-	AuditTTY  bool
-	AuditPath string
-	AuditExec bool
-	Replay    bool
+	HomeDir    string
+	Port       int
+	Once       bool
+	Token      string
+	LogLevel   *slog.LevelVar
+	User       *user.User
+	AuditTTY   bool
+	AuditPath  string
+	AuditExec  bool
+	Replay     bool
+	ReplayFile string
 }
 
 func LoadConfig() Config {
@@ -37,7 +38,8 @@ func LoadConfig() Config {
 	flag.StringVar(&cfg.AuditPath, "audit-path", "/tmp", "Directory to write audit logs to")
 
 	// Replayer is still work-in-progress
-	// flag.BoolVar(&cfg.Replay, "replay", false, "Enabled replay of audit files.")
+	flag.BoolVar(&cfg.Replay, "replay", false, "Enabled replay of audit files")
+	flag.StringVar(&cfg.ReplayFile, "replay-file", "", "Path to audit file to replay")
 
 	audit := flag.Bool("audit", false, "Enabled all auditing")
 	username := flag.String("user", "", "User to run shell as")
