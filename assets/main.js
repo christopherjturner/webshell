@@ -1,4 +1,5 @@
 let terminal
+let ws
 
 function debounce(func, timeout = 300) {
     let timer;
@@ -6,6 +7,11 @@ function debounce(func, timeout = 300) {
         clearTimeout(timer)
         timer = setTimeout(() => func.apply(this, args), timeout)
     }
+}
+
+function reloadFiles() {
+    const frame = document.getElementById("file-frame")
+    frame.src = frame.src
 }
 
 function init(shellPath) {
@@ -23,7 +29,7 @@ function init(shellPath) {
 
     const protocol = (location.protocol === "https:") ? "wss://" : "ws://"
     const url = protocol + location.host + shellPath
-    const ws = new WebSocket(url)
+    ws = new WebSocket(url)
     const attachAddon = new AttachAddon.AttachAddon(ws)
     const fitAddon = new FitAddon.FitAddon()
 
@@ -68,6 +74,11 @@ function init(shellPath) {
         window.onresize = debounce(function () {
             fitAddon.fit()
         })
+    }
+
+    const fileTab = document.getElementById('tab-2')
+    if(fileTab) {
+        fileTab.addEventListener('change', reloadFiles)
     }
 }
 

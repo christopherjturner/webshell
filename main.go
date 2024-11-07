@@ -17,19 +17,18 @@ import (
 var assetsFS embed.FS
 var config Config
 var logger *slog.Logger
-var auditWriter *logging.AuditWriter
+var auditLogger *slog.Logger
 
 func main() {
 
 	config = LoadConfigFromEnv()
+
+	// Set up loggers.
 	logger = logging.NewEcsLogger("terminal", config.LogLevel)
+	auditLogger = logging.NewEcsLogger("session", config.LogLevel)
 
-	auditLog := logging.NewSlogWriter(logging.NewEcsLogger("session", config.LogLevel))
-	auditWriter = logging.NewAuditWriter(auditLog)
-
-	// Add middleware to websocket handler
+	// Add middleware to websocket handler.
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
-
 	if config.Once {
 		wsHandler = haltOnExit(once(wsHandler))
 		logger.Info("Server will EXIT after the first connection closes")
@@ -39,6 +38,14 @@ func main() {
 	webshellMux := http.NewServeMux()
 	webshellMux.HandleFunc("/{$}", termPageHandler)
 	webshellMux.Handle("/shell", wsHandler)
+
+	// Playback of audit files. Still a work in progress
+	if config.Replay {
+		wsReplayHandler := websocket.Handler(replayHandler)
+		webshellMux.Handle("/replay/ws", wsReplayHandler)
+		webshellMux.HandleFunc("/replay", replayPageHandler)
+	}
+
 	webshellMux.HandleFunc("/home", getFileHandler)
 	webshellMux.HandleFunc("/upload", uploadFileHandler)
 	webshellMux.HandleFunc("/home/{filename...}", getFileHandler)
@@ -47,6 +54,7 @@ func main() {
 	// Combined routes.
 	rootMux := http.NewServeMux()
 	rootMux.Handle("/"+config.Token+"/", http.StripPrefix("/"+config.Token, webshellMux))
+
 	rootMux.HandleFunc("/health", healthHandler)
 
 	logger.Info(fmt.Sprintf("Listening on 0.0.0.0:%d", config.Port))

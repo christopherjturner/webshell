@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>CDP Terminal - Replay</title>
+  <link rel="stylesheet" href="./assets/shell.css"/>
+  <link rel="stylesheet" href="./assets/xterm.min.css"/>
+  <script src="./assets/xterm-addon-fit.min.js"></script>
+  <script src="./assets/xterm.min.js"></script>
+  <script src="./assets/addon-attach.min.js"></script>
+</head>
+<body>
+<div class="tabs-container">
+
+  <input type="radio" id="tab-1" name="tabs" checked>
+  <label for="tab-1" class="tab-label">
+    Replay
+  </label>
+  <div class="tab-content">
+    <div class="terminal-container replay">
+      <div id="terminal"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="./assets/main.js"></script>
+<script type="text/javascript">
+  init("/{{ .Token }}/replay/ws")
+</script>
+</body>
+</html>
