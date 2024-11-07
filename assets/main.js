@@ -9,6 +9,11 @@ function debounce(func, timeout = 300) {
     }
 }
 
+function reloadFiles() {
+    const frame = document.getElementById("file-frame")
+    frame.src = frame.src
+}
+
 function init(shellPath) {
     terminal = new Terminal({
         screenKeys: true,
@@ -69,6 +74,11 @@ function init(shellPath) {
         window.onresize = debounce(function () {
             fitAddon.fit()
         })
+    }
+
+    const fileTab = document.getElementById('tab-2')
+    if(fileTab) {
+        fileTab.addEventListener('change', reloadFiles)
     }
 }
 
