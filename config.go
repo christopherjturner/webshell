@@ -50,7 +50,7 @@ func LoadConfig() Config {
 	if *username != "" {
 		user, err := user.Lookup(*username)
 		if err != nil {
-			println("Invalid username")
+			println("Invalid user")
 			os.Exit(1)
 		} else {
 			cfg.User = user
