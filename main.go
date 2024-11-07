@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 	"webshell/logging"
 
@@ -67,6 +70,14 @@ func main() {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-shutdown
+		logger.Info("Shutdown signal received, stopping server")
+		s.Shutdown(context.TODO())
+	}()
 
 	log.Fatal(s.ListenAndServe())
 }
