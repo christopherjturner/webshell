@@ -31,7 +31,6 @@ func filter(s string) bool {
 }
 
 func parse(s string) (StraceExecve, error) {
-	println(s)
 	res := StraceExecve{}
 	m := execveRx.FindStringSubmatch(s)
 	if m == nil {
