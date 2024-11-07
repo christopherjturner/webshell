@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	//	"os/signal"
 	"os/user"
 	"strconv"
 	"strings"
@@ -49,6 +51,8 @@ func filterEnv(o []string) []string {
 	return environ
 }
 
+var ttyWait sync.WaitGroup
+
 func shellHandler(ws *websocket.Conn) {
 
 	logger.Info("New webshell session started")
@@ -64,12 +68,26 @@ func shellHandler(ws *websocket.Conn) {
 	}
 
 	tty, err := pty.Start(cmd)
-
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to start %s: %s", shell, err))
 		websocket.Message.Send(ws, "Failed to start shell")
 		return
 	}
+
+	sigChan := make(chan os.Signal, 1)
+	ctx, cancel := context.WithCancel(ws.Request().Context())
+
+	go func() {
+		//signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		select {
+		case <-ctx.Done():
+			logger.Warn("Context Cancelled, killing pid %d", cmd.Process.Pid)
+			cmd.Process.Kill()
+		case s := <-sigChan:
+			logger.Warn(fmt.Sprintf("Forwarding signal %s to pid %d", s, cmd.Process.Pid))
+			//cmd.Process.Kill()
+		}
+	}()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -89,7 +107,7 @@ func shellHandler(ws *websocket.Conn) {
 			logger.Error(fmt.Sprintf("TTYRec failed to start: %v", err))
 			return
 		}
-
+		ttyWait.Add(1)
 		logger.Info("TTY auditing is enabled")
 	}
 
@@ -104,8 +122,9 @@ func shellHandler(ws *websocket.Conn) {
 		logger.Info("Syscall auditing is enabled")
 	}
 
+	// Gracefully stop the session
 	defer func() {
-		logger.Info("Stopping terminal")
+		logger.Info(fmt.Sprintf("Stopping shell PID %d", cmd.Process.Pid))
 		if err := cmd.Process.Kill(); err != nil {
 			logger.Error(fmt.Sprintf("failed to stop process: %s", err))
 		}
@@ -126,11 +145,12 @@ func shellHandler(ws *websocket.Conn) {
 		if err := recorder.Save(); err != nil {
 			logger.Error(fmt.Sprintf("Failed to save ttyrec: %s", err))
 		}
+		logger.Info("Audit file written")
 
 		if err := recorder.Close(); err != nil {
 			logger.Error(fmt.Sprintf("Failed to close TTYRecorder: %s", err))
 		}
-
+		ttyWait.Done()
 	}()
 
 	// TTY to WS
@@ -209,6 +229,8 @@ func shellHandler(ws *websocket.Conn) {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 		}
+		cancel()
+		//sigChan <- syscall.SIGTERM
 	}()
 
 	wg.Wait()
