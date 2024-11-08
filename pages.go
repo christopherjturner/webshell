@@ -40,7 +40,8 @@ type homeDirParams struct {
 	Files      []FileLink
 }
 
-// Handles rendering the main xterm.js page.
+// Xterm.js handlers
+
 func termPageHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -68,12 +69,13 @@ func replayPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Handler for displaying directory content and downloading files.
+// File upload handlers
+
 func getFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	filename := filepath.Clean(r.PathValue("filename"))
 
-	stat, err := os.Stat(path.Join(config.HomeDir, filename))
+	stat, err := os.Stat(filepath.Join(config.HomeDir, filename))
 	if err != nil {
 		http.Error(w, "File Not Found", 404)
 		return
@@ -86,22 +88,30 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Handler for downloading a given file.
 func downloadFile(w http.ResponseWriter, filename string) {
-	f, err := os.Open(path.Join(config.HomeDir, filename))
+
+	filename = filepath.Join(config.HomeDir, filepath.Clean(filename))
+	logger.Info(fmt.Sprintf("Downloading %s", filename))
+
+	if !isPathSafe(filename) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	f, err := os.Open(filename)
 	if err != nil {
-		http.Error(w, "File Not Found", 404)
+		fmt.Printf("%v\n", err)
+		http.Error(w, "File Not Found", http.StatusNotFound)
 		return
 	}
 	defer f.Close()
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	if _, err := io.Copy(w, f); err != nil {
-		http.Error(w, "Error reading file "+f.Name(), 500)
+		http.Error(w, "Error reading file "+f.Name(), http.StatusInternalServerError)
 	}
 }
 
-// Handles listing the contents of a directory.
 func listFiles(w http.ResponseWriter, filename string, error string) {
 
 	homePath := path.Join("/", config.Token, "/home")
@@ -116,7 +126,15 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 
 	w.Header().Add("Content-Type", "text/html")
 
-	f, err := os.Open(path.Join(config.HomeDir, filename))
+	dirToList := filepath.Join(config.HomeDir, filepath.Clean(filename))
+
+	if !isPathSafe(dirToList) {
+		logger.Error(fmt.Sprintf("Declined to list files in %s", dirToList))
+		params.Error = "Unable to list directory outside of home dir."
+		return
+	}
+
+	f, err := os.Open(dirToList)
 	if err != nil {
 		params.Error = "Unable read directory"
 		if err := fileTemplate.Execute(w, params); err != nil {
@@ -148,7 +166,7 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 	for _, file := range files {
 		link := FileLink{
 			Name:  file.Name(),
-			Path:  path.Clean(path.Join(homePath, filename, file.Name())),
+			Path:  path.Join(homePath, filename, file.Name()),
 			IsDir: file.IsDir(),
 		}
 		params.Files = append(params.Files, link)
@@ -175,39 +193,60 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		fileError(w, "Method not allowed")
 		return
 	}
 
-	// Validate payload
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		listFiles(w, ".", "Failed to parse multipart message")
+		fileError(w, "Failed to parse multipart message")
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		listFiles(w, ".", "Upload failed, invalid file")
+		fileError(w, "Upload failed, invalid file")
 		return
 	}
 	defer file.Close()
 
-	// TODO: upload file to the selected dir rather than home dir
-	filePath := filepath.Join(config.HomeDir, header.Filename)
+	filePath := filepath.Join(config.HomeDir, filepath.Clean(header.Filename))
+
+	if !isPathSafe(filePath) {
+		fileError(w, "File is outside of the homedir")
+		return
+	}
+
+	// Make sure we don't overwrite anything.
+	if checkFileExists(filePath) {
+		fileError(w, "File already exists")
+		return
+	}
 
 	dst, err := os.Create(filePath)
 	if err != nil {
-		listFiles(w, ".", "Upload failed, failed to create file")
+		fileError(w, "Upload failed, failed to create file")
 		return
 	}
 	defer dst.Close()
 
+	// Ensure the file is owned by the shell user, not the server
+	if config.User != nil {
+		if err := chown(dst, config.User); err != nil {
+			fileError(w, "Upload failed, failed to create file for user")
+			return
+		}
+	}
+
 	if _, err := io.Copy(dst, file); err != nil {
-		listFiles(w, ".", "Upload failed, failed to write file")
+		fileError(w, "Upload failed, failed to write file")
 		return
 	}
 
 	// Reload the file page
 	homePath := path.Join("/", config.Token, "/home")
 	http.Redirect(w, r, homePath, http.StatusSeeOther)
+}
+
+func fileError(w http.ResponseWriter, error string) {
+	listFiles(w, ".", error)
 }
