@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	//	"os/signal"
 	"os/user"
 	"strconv"
 	"strings"
@@ -51,13 +50,13 @@ func filterEnv(o []string) []string {
 	return environ
 }
 
-var ttyWait sync.WaitGroup
-
 func shellHandler(ws *websocket.Conn) {
 
+	ctxLocal, cancelLocal := context.WithCancel(ws.Request().Context())
 	logger.Info("New webshell session started")
 	var err error
 
+	// Start the shell
 	cmd := exec.Command(shell)
 	cmd.Env = filterEnv(os.Environ())
 	cmd.Dir = config.HomeDir
@@ -74,25 +73,9 @@ func shellHandler(ws *websocket.Conn) {
 		return
 	}
 
-	sigChan := make(chan os.Signal, 1)
-	ctx, cancel := context.WithCancel(ws.Request().Context())
-
-	go func() {
-		//signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		select {
-		case <-ctx.Done():
-			logger.Warn("Context Cancelled, killing pid %d", cmd.Process.Pid)
-			cmd.Process.Kill()
-		case s := <-sigChan:
-			logger.Warn(fmt.Sprintf("Forwarding signal %s to pid %d", s, cmd.Process.Pid))
-			//cmd.Process.Kill()
-		}
-	}()
-
+	activeConnections.Add(1)
 	var wg sync.WaitGroup
 	wg.Add(1)
-
-	// Auditing
 
 	// TTY Recorder
 	// When TTY Recorder is disabled we use a non-functioning version of it in its place.
@@ -107,11 +90,13 @@ func shellHandler(ws *websocket.Conn) {
 			logger.Error(fmt.Sprintf("TTYRec failed to start: %v", err))
 			return
 		}
-		ttyWait.Add(1)
+
 		logger.Info("TTY auditing is enabled")
 	}
 
 	// Syscall Exec auditing
+	// Requires strace to be installed.
+	// AuditExec will error if its enabled and strace is not found.
 	if config.AuditExec {
 		straceAudit := strace.NewStraceLogger(auditLogger)
 		if err := straceAudit.Attach(cmd.Process.Pid); err != nil {
@@ -150,10 +135,10 @@ func shellHandler(ws *websocket.Conn) {
 		if err := recorder.Close(); err != nil {
 			logger.Error(fmt.Sprintf("Failed to close TTYRecorder: %s", err))
 		}
-		ttyWait.Done()
+		activeConnections.Done()
 	}()
 
-	// TTY to WS
+	// Shell -> User
 	go func() {
 		buffer := make([]byte, maxBufferSizeBytes)
 
@@ -177,9 +162,12 @@ func shellHandler(ws *websocket.Conn) {
 				continue
 			}
 		}
+
+		// Close the socket, this will stop User -> Shell
+		ws.Close()
 	}()
 
-	// WS to TTY
+	// User -> Shell
 	go func() {
 		buffer := make([]byte, maxBufferSizeBytes)
 		for {
@@ -229,9 +217,22 @@ func shellHandler(ws *websocket.Conn) {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 		}
-		cancel()
-		//sigChan <- syscall.SIGTERM
+
+		// Kill the shell, this will stop the Shell -> User routine
+		cmd.Process.Kill()
+	}()
+
+	// Stop the handler if the global context is cancelled
+	go func() {
+		select {
+		case <-globalCtx.Done():
+			logger.Debug("Cancelling Websocket Handler")
+			_ = ws.Close()
+			return
+		case <-ctxLocal.Done():
+		}
 	}()
 
 	wg.Wait()
+	cancelLocal() // Stop the global context listener
 }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 	"webshell/logging"
@@ -18,19 +19,26 @@ import (
 
 //go:embed assets/*
 var assetsFS embed.FS
-var config Config
-var logger *slog.Logger
-var auditLogger *slog.Logger
+
+var (
+	config      Config
+	logger      *slog.Logger
+	auditLogger *slog.Logger
+
+	globalCtx         context.Context
+	cancelFunc        context.CancelFunc
+	activeConnections sync.WaitGroup
+)
 
 func main() {
 
-	ctx, cancel := context.WithCancel(context.Background())
+	globalCtx, cancelFunc = context.WithCancel(context.Background())
 
 	config = LoadConfigFromEnv()
 	logger = logging.NewEcsLogger("terminal", config.LogLevel)
 	auditLogger = logging.NewEcsLogger("session", config.LogLevel)
 
-	routes := buildRoutes(ctx)
+	routes := buildRoutes()
 
 	server := &http.Server{
 		Addr:           fmt.Sprintf(":%d", config.Port),
@@ -47,7 +55,8 @@ func main() {
 		<-sigChan
 
 		logger.Warn("Shutdown signal received")
-		shutdownCtx, shutdownRelease := context.WithTimeout(ctx, 10*time.Second)
+
+		shutdownCtx, shutdownRelease := context.WithTimeout(globalCtx, 10*time.Second)
 		defer shutdownRelease()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
@@ -66,14 +75,8 @@ func main() {
 
 	// Gracefully stop any active websocket connections.
 	logger.Info("Waiting for handlers to exit")
-	cancel()
-	ttyWait.Wait()
-}
-
-func withCtx(h http.Handler, ctx context.Context) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.ServeHTTP(w, r.WithContext(ctx))
-	})
+	cancelFunc()
+	activeConnections.Wait()
 }
 
 // Middleware to log inbound requests.
@@ -106,11 +109,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func buildRoutes(ctx context.Context) http.Handler {
+func buildRoutes() http.Handler {
 	// Add middleware to websocket handler.
 	var wsHandler http.Handler = websocket.Handler(shellHandler)
 	if config.Once {
-		wsHandler = once(withCtx(wsHandler, ctx))
+		wsHandler = once(wsHandler)
 		logger.Info("Server will EXIT after the first connection closes")
 	}
 
