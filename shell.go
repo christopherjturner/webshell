@@ -189,7 +189,6 @@ func shellHandler(ws *websocket.Conn) {
 			// Special purpose payloads.
 			if b[0] == 1 {
 				specialPayload := string(bytes.Trim(b[1:], " \n\r\t\x00\x01"))
-				logger.Info("special payload " + specialPayload)
 				if len(specialPayload) == 0 {
 					continue
 				}
@@ -208,8 +207,8 @@ func shellHandler(ws *websocket.Conn) {
 						continue
 					}
 
-					cols, _ := strconv.Atoi(fields[1])
-					rows, _ := strconv.Atoi(fields[2])
+					cols, _ := strconv.ParseInt(fields[1], 10, 16)
+					rows, _ := strconv.ParseInt(fields[2], 10, 16)
 
 					logger.Debug(fmt.Sprintf("Resizing tty to use %d rows and %d columns...", rows, cols))
 
