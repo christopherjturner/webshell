@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,8 +19,14 @@ import (
 	"webshell/ttyrec"
 )
 
-const shell = "/bin/bash"
-const maxBufferSizeBytes = 1024 * 256
+const (
+	shell              = "/bin/bash"
+	maxBufferSizeBytes = 1024 * 256
+)
+
+var restrictedEnvVars = map[string]bool{
+	"AUDIT_UPLOAD_URL": true,
+}
 
 type TTYSize struct {
 	Cols uint16 `json:"cols"`
@@ -30,6 +35,7 @@ type TTYSize struct {
 	Y    uint16 `json:"y"`
 }
 
+// Sets a command to run as a different user.
 func runAs(cmd *exec.Cmd, user *user.User) {
 	uid, _ := strconv.ParseInt(user.Uid, 10, 32)
 	gid, _ := strconv.ParseInt(user.Gid, 10, 32)
@@ -39,6 +45,7 @@ func runAs(cmd *exec.Cmd, user *user.User) {
 	cmd.Env = append(cmd.Env, fmt.Sprintf("HOME=%s", user.HomeDir))
 }
 
+// Removes any restricted keys from the parent environment
 func filterEnv(o []string) []string {
 	environ := []string{}
 	for _, e := range o {
@@ -50,6 +57,7 @@ func filterEnv(o []string) []string {
 	return environ
 }
 
+// WebShell's websocket handler
 func shellHandler(ws *websocket.Conn) {
 
 	ctxLocal, cancelLocal := context.WithCancel(ws.Request().Context())
@@ -111,7 +119,7 @@ func shellHandler(ws *websocket.Conn) {
 	defer func() {
 		logger.Info(fmt.Sprintf("Stopping shell PID %d", cmd.Process.Pid))
 		if err := cmd.Process.Kill(); err != nil {
-			logger.Error(fmt.Sprintf("failed to stop process: %s", err))
+			logger.Error(fmt.Sprintf("Failed to stop process: %s", err))
 		}
 
 		if _, err := cmd.Process.Wait(); err != nil {
@@ -151,14 +159,14 @@ func shellHandler(ws *websocket.Conn) {
 			}
 
 			if err := websocket.Message.Send(ws, buffer[:l]); err != nil {
-				logger.Error("failed to forward tty to ws")
+				logger.Error("Failed to forward tty to ws")
 				continue
 			}
 
 			// Copy data to TTY Recorder.
 			// TODO: maybe use a TeeReader instead
 			if _, err := recorder.Write(buffer[:l]); err != nil {
-				logger.Error("failed record tty to ws")
+				logger.Error("Failed record tty to ws")
 				continue
 			}
 		}
@@ -180,35 +188,42 @@ func shellHandler(ws *websocket.Conn) {
 
 			// Special purpose payloads.
 			if b[0] == 1 {
-				specialPayload := bytes.Trim(b[1:], " \n\r\t\x00\x01")
-
+				specialPayload := string(bytes.Trim(b[1:], " \n\r\t\x00\x01"))
+				logger.Info("special payload " + specialPayload)
 				if len(specialPayload) == 0 {
 					continue
 				}
 
 				// Response to ping messages
-				if string(specialPayload) == "PING" {
+				if specialPayload == "PING" {
 					logger.Debug("PING")
 					continue
 				}
 
-				// TODO: maybe do a non-json version of this payload?
-				ttySize := &TTYSize{}
+				// Resize payload (SIZE COL ROW)
+				if strings.HasPrefix(specialPayload, "SIZE") {
+					fields := strings.Fields(specialPayload)
+					if len(fields) != 3 {
+						logger.Error("Invalid resize payload: " + specialPayload)
+						continue
+					}
 
-				if err := json.Unmarshal(specialPayload, ttySize); err != nil {
-					logger.Warn(fmt.Sprintf("failed to unmarshal received resize message '%s': %s", string(specialPayload), err))
+					cols, _ := strconv.Atoi(fields[1])
+					rows, _ := strconv.Atoi(fields[2])
+
+					logger.Debug(fmt.Sprintf("Resizing tty to use %d rows and %d columns...", rows, cols))
+
+					if err := pty.Setsize(tty, &pty.Winsize{
+						Rows: uint16(rows),
+						Cols: uint16(cols),
+					}); err != nil {
+						logger.Warn(fmt.Sprintf("Failed to resize tty, error: %s", err))
+					}
+
 					continue
 				}
 
-				logger.Debug(fmt.Sprintf("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols))
-
-				if err := pty.Setsize(tty, &pty.Winsize{
-					Rows: ttySize.Rows,
-					Cols: ttySize.Cols,
-				}); err != nil {
-					logger.Warn(fmt.Sprintf("failed to resize tty, error: %s", err))
-				}
-				continue
+				logger.Info("Unknown special payload " + specialPayload)
 			}
 
 			// Forward to the process.
