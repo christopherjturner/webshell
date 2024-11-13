@@ -28,13 +28,6 @@ var restrictedEnvVars = map[string]bool{
 	"AUDIT_UPLOAD_URL": true,
 }
 
-type TTYSize struct {
-	Cols uint16 `json:"cols"`
-	Rows uint16 `json:"rows"`
-	X    uint16 `json:"x"`
-	Y    uint16 `json:"y"`
-}
-
 // Sets a command to run as a different user.
 func runAs(cmd *exec.Cmd, user *user.User) {
 	uid, _ := strconv.ParseInt(user.Uid, 10, 32)
@@ -60,8 +53,11 @@ func filterEnv(o []string) []string {
 // WebShell's websocket handler
 func shellHandler(ws *websocket.Conn) {
 
-	ctxLocal, cancelLocal := context.WithCancel(ws.Request().Context())
 	logger.Info("New webshell session started")
+
+	ctxLocal, cancelLocal := context.WithCancel(ws.Request().Context())
+	defer cancelLocal()
+
 	var err error
 
 	// Start the shell
@@ -155,7 +151,7 @@ func shellHandler(ws *websocket.Conn) {
 			if err != nil {
 				websocket.Message.Send(ws, "session ended")
 				wg.Done()
-				return
+				break
 			}
 
 			if err := websocket.Message.Send(ws, buffer[:l]); err != nil {
@@ -207,8 +203,13 @@ func shellHandler(ws *websocket.Conn) {
 						continue
 					}
 
-					cols, _ := strconv.ParseInt(fields[1], 10, 16)
-					rows, _ := strconv.ParseInt(fields[2], 10, 16)
+					cols, errCol := strconv.ParseInt(fields[1], 10, 16)
+					rows, errRow := strconv.ParseInt(fields[2], 10, 16)
+
+					if errCol != nil || errRow != nil {
+						logger.Error("Invalid resize payload: " + specialPayload)
+						continue
+					}
 
 					logger.Debug(fmt.Sprintf("Resizing tty to use %d rows and %d columns...", rows, cols))
 
@@ -248,5 +249,4 @@ func shellHandler(ws *websocket.Conn) {
 	}()
 
 	wg.Wait()
-	cancelLocal() // Stop the global context listener
 }

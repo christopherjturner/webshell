@@ -17,7 +17,7 @@ type FileLink struct {
 	IsDir bool
 }
 
-type homeDirParams struct {
+type filePageParams struct {
 	AssetsPath string
 	UploadPath string
 	CurrentDir string
@@ -54,7 +54,7 @@ func downloadFile(w http.ResponseWriter, filename string) {
 
 	f, err := os.Open(filename)
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		logger.Error("%v\n", err)
 		http.Error(w, "File Not Found", http.StatusNotFound)
 		return
 	}
@@ -70,7 +70,7 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 
 	homePath := path.Join("/", config.Token, "/home")
 
-	params := homeDirParams{
+	params := filePageParams{
 		AssetsPath: path.Join("/", config.Token, "/assets"),
 		UploadPath: path.Join("/", config.Token, "/upload"),
 		CurrentDir: path.Join(config.HomeDir, filename),
@@ -178,29 +178,29 @@ func upload(file io.Reader, filename string) error {
 	filePath := filepath.Join(config.HomeDir, filepath.Clean(filename))
 
 	if !isPathSafe(filePath) {
-		return errors.New("File is outside of the homedir")
+		return errors.New("file is outside of the homedir")
 	}
 
 	// Make sure we don't overwrite anything.
 	if checkFileExists(filePath) {
-		return errors.New("File already exists")
+		return errors.New("file already exists")
 	}
 
 	dst, err := os.Create(filePath)
 	if err != nil {
-		return errors.New("Upload failed, failed to create file")
+		return errors.New("upload failed, failed to create file")
 	}
 	defer dst.Close()
 
 	// Ensure the file is owned by the shell user, not the server
 	if config.User != nil {
 		if err := chown(dst, config.User); err != nil {
-			return errors.New("Upload failed, failed to create file for user")
+			return errors.New("upload failed, failed to create file for user")
 		}
 	}
 
 	if _, err := io.Copy(dst, file); err != nil {
-		return errors.New("Upload failed, failed to write file")
+		return errors.New("upload failed, failed to write file")
 	}
 
 	return nil
