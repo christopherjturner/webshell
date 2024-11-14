@@ -81,9 +81,13 @@ func (r Recorder) Close() error {
 	errTty := r.ttyFile.Close()
 	errTime := r.timeFile.Close()
 
+	_ = os.Remove(r.ttyFile.Name())
+	_ = os.Remove(r.timeFile.Name())
+
 	if errTty != nil {
 		return errTty
 	}
+
 	if errTime != nil {
 		return errTime
 	}

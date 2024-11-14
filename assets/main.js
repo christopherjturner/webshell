@@ -63,9 +63,9 @@ function init(shellPath) {
         terminal.onResize(debounce(function (event) {
             const rows = event.rows
             const cols = event.cols
-            const resize = JSON.stringify({ cols: cols, rows: rows + 1 })
-            console.log(resize)
-            const msg = new TextEncoder().encode("\x01" + resize)
+
+            console.log(`resizing ${rows} ${cols}`)
+            const msg = new TextEncoder().encode("\x01SIZE " + cols + " " + (rows + 1))
             ws.send(msg)
         }))
 

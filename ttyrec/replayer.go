@@ -56,10 +56,7 @@ func (a *Replayer) Play(w io.Writer) {
 	timings := a.Record.Timings
 	a.Record.Audit.Seek(0, 0)
 
-	fmt.Println("Starting replay")
-
 	for i := 0; i < len(timings); i++ {
-		fmt.Printf("frame %d\n", i)
 		// Copy chunk.
 		toCopy := int64(timings[i].Offset - offset)
 		offset = timings[i].Offset
@@ -77,6 +74,7 @@ func (a *Replayer) Play(w io.Writer) {
 			lastTime = timings[i].Time
 		}
 
+		// Handle playback speed
 		sleepFor := (timings[i].Time - lastTime)
 		if a.Speed > 0 {
 			sleepFor /= a.Speed
