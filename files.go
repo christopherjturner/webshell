@@ -25,21 +25,28 @@ type filePageParams struct {
 	Files      []FileLink
 }
 
-func getFileHandler(w http.ResponseWriter, r *http.Request) {
+func filesHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-	filename := filepath.Clean(r.PathValue("filename"))
+		if r.Method == "POST" {
+			uploadFileHandler(w, r)
+			return
+		}
 
-	stat, err := os.Stat(filepath.Join(config.HomeDir, filename))
-	if err != nil {
-		http.Error(w, "File Not Found", 404)
-		return
-	}
+		filename := filepath.Clean(r.PathValue("filename"))
 
-	if stat.IsDir() {
-		listFiles(w, filename, "")
-	} else {
-		downloadFile(w, filename)
-	}
+		stat, err := os.Stat(filepath.Join(config.HomeDir, filename))
+		if err != nil {
+			http.Error(w, "File Not Found", 404)
+			return
+		}
+
+		if stat.IsDir() {
+			listFiles(w, filename, "")
+		} else {
+			downloadFile(w, filename)
+		}
+	})
 }
 
 func downloadFile(w http.ResponseWriter, filename string) {
@@ -83,7 +90,7 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 	dirToList := filepath.Join(config.HomeDir, filepath.Clean(filename))
 
 	if !isPathSafe(dirToList) {
-		logger.Error(fmt.Sprintf("Declined to list files in %s", dirToList))
+		logger.Error(fmt.Sprintf("Declined to list files in %s as its not a subdir of %s", dirToList, config.HomeDir))
 		params.Error = "Unable to list directory outside of home dir."
 		return
 	}
@@ -137,7 +144,6 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 	})
 
 	// Render the template.
-	w.Header().Add("Content-Type", "text/html")
 	if err := fileTemplate.Execute(w, params); err != nil {
 		logger.Error(fmt.Sprintf("%s", err))
 	}

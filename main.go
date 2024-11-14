@@ -79,65 +79,49 @@ func main() {
 	activeConnections.Wait()
 }
 
-// Middleware to log inbound requests.
-func requestLogger(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Info(r.URL.Path)
-		h.ServeHTTP(w, r)
-	})
-}
-
-// Has the login token already been used.
-var keyUsed = false
-
-// Allow only one connection and stop the server when its closed.
-func once(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		if keyUsed {
-			http.Error(w, "expired", http.StatusUnauthorized)
-			return
-		}
-		keyUsed = true
-		h.ServeHTTP(w, r)
-		os.Exit(0)
-	})
-}
-
 // Minimal healthcheck endpoint.
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
 func buildRoutes() http.Handler {
+
+	rootPrefix := "/" + config.Token
+	rootPath := rootPrefix + "/"
+
 	// Add middleware to websocket handler.
-	var wsHandler http.Handler = websocket.Handler(shellHandler)
+	var (
+		wsHandler       http.Handler = websocket.Handler(shellHandler)
+		termPageHandler http.Handler = termPageHandler(config.Token)
+		filesHandler    http.Handler = filesHandler()
+	)
+
+	o := NewOnceMiddleware(rootPrefix)
 	if config.Once {
-		wsHandler = once(wsHandler)
+		wsHandler = o.once(wsHandler)
+		termPageHandler = o.setCookie(termPageHandler)
+		filesHandler = o.requireCookie(filesHandler)
 		logger.Info("Server will EXIT after the first connection closes")
 	}
 
 	// Webshell routes.
 	webshellMux := http.NewServeMux()
-	webshellMux.HandleFunc("/{$}", termPageHandler)
+	webshellMux.Handle("/{$}", termPageHandler)
 	webshellMux.Handle("/shell", wsHandler)
+	webshellMux.Handle("/home", filesHandler)
+	webshellMux.Handle("/upload", filesHandler)
+	webshellMux.Handle("/home/{filename...}", filesHandler)
+	webshellMux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
 
 	// Playback of audit files. Still a work in progress
 	if config.Replay {
-		wsReplayHandler := websocket.Handler(replayHandler)
-		webshellMux.Handle("/replay/ws", wsReplayHandler)
-		webshellMux.HandleFunc("/replay", replayPageHandler)
+		webshellMux.Handle("/replay/ws", websocket.Handler(replayHandler))
+		webshellMux.Handle("/replay", replayPageHandler(config.Token))
 	}
-
-	webshellMux.HandleFunc("/home", getFileHandler)
-	webshellMux.HandleFunc("/upload", uploadFileHandler)
-	webshellMux.HandleFunc("/home/{filename...}", getFileHandler)
-	webshellMux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
 
 	// Combined routes.
 	rootMux := http.NewServeMux()
-	rootMux.Handle("/"+config.Token+"/", http.StripPrefix("/"+config.Token, webshellMux))
-
+	rootMux.Handle(rootPath, http.StripPrefix(rootPrefix, webshellMux))
 	rootMux.HandleFunc("/health", healthHandler)
 	rootMux.HandleFunc("/debug", debugHandler)
 
