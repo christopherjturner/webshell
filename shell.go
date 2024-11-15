@@ -168,7 +168,7 @@ func shellHandler(ws *websocket.Conn) {
 		}
 
 		// Close the socket, this will stop User -> Shell
-		ws.Close()
+		_ = ws.Close()
 	}()
 
 	// User -> Shell
@@ -185,13 +185,8 @@ func shellHandler(ws *websocket.Conn) {
 			// Special purpose payloads.
 			if b[0] == 1 {
 				specialPayload := string(bytes.Trim(b[1:], " \n\r\t\x00\x01"))
-				if len(specialPayload) == 0 {
-					continue
-				}
 
-				// Response to ping messages
 				if specialPayload == "PING" {
-					logger.Debug("PING")
 					continue
 				}
 

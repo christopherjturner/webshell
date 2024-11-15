@@ -26,9 +26,9 @@
       {{range .Files}}
       <li>
         {{ if .IsDir }}
-        <a href="{{ .Path }}" class="dir">{{ .Name }}/</a>
+        <a href="{{ .Link }}" class="dir">{{ .Name }}/</a>
         {{ else }}
-        <a href="{{ .Path }}" class="file" target="_blank">{{ .Name }}</a>
+        <a href="{{ .Link }}" class="file" target="_blank">{{ .Name }}</a>
         {{ end }}
       </li>
       {{end}}
