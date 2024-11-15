@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <link rel="stylesheet" href="{{ .AssetsPath }}/shell.css" />
+    <script>let FF_FOUC_FIX;</script>
+</head>
+
+<body style="margin:0;">
+  <div class="file-section" id="files">
+    <h2>Error</h2>
+
+    <div class="error">
+      {{ .Error }}
+    </div>
+
+    <div>
+      <a href="{{ .Home }}">Back to files</a>
+    </div>
+  </div>
+</body>
+</html>

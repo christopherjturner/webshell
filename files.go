@@ -4,20 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type FileLink struct {
-	Path  string
+	Link  string
 	Name  string
 	IsDir bool
 }
 
-type filePageParams struct {
+type fileParams struct {
 	AssetsPath string
 	UploadPath string
 	CurrentDir string
@@ -25,43 +28,57 @@ type filePageParams struct {
 	Files      []FileLink
 }
 
-func filesHandler() http.Handler {
+type errorParams struct {
+	AssetsPath string
+	Home       string
+	Error      string
+}
+
+type FilesHandler struct {
+	baseDir string
+	baseUrl string
+	user    *user.User
+	logger  *slog.Logger
+}
+
+func (fh FilesHandler) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == "POST" {
-			uploadFileHandler(w, r)
+			fh.uploadFileHandler(w, r)
 			return
 		}
 
-		filename := filepath.Clean(r.PathValue("filename"))
+		// Path to the requested file on the local filesystem.
+		filename := filepath.Join(fh.baseDir, filepath.Clean(r.PathValue("filename")))
 
-		stat, err := os.Stat(filepath.Join(config.HomeDir, filename))
+		// Deny requests to anything outside of the baseDir.
+		if !fh.isPathSafe(filename) {
+			fh.logger.Error("Refusing to serve files from " + filename + " as its outside the root dir " + fh.baseDir)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		// Check file/dir exists.
+		stat, err := os.Stat(filename)
 		if err != nil {
 			http.Error(w, "File Not Found", 404)
 			return
 		}
 
 		if stat.IsDir() {
-			listFiles(w, filename, "")
+			fh.listFiles(w, filename, "")
 		} else {
-			downloadFile(w, filename)
+			fh.downloadFile(w, filename)
 		}
 	})
 }
 
-func downloadFile(w http.ResponseWriter, filename string) {
-
-	filename = filepath.Join(config.HomeDir, filepath.Clean(filename))
-	logger.Info(fmt.Sprintf("Downloading %s", filename))
-
-	if !isPathSafe(filename) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
+func (fh FilesHandler) downloadFile(w http.ResponseWriter, filename string) {
 
 	f, err := os.Open(filename)
 	if err != nil {
-		logger.Error("%v\n", err)
+		fh.logger.Error(err.Error())
 		http.Error(w, "File Not Found", http.StatusNotFound)
 		return
 	}
@@ -73,52 +90,36 @@ func downloadFile(w http.ResponseWriter, filename string) {
 	}
 }
 
-func listFiles(w http.ResponseWriter, filename string, error string) {
+func (fh FilesHandler) listFiles(w http.ResponseWriter, dirname string, error string) {
 
-	homePath := path.Join("/", config.Token, "/home")
+	fh.logger.Info(fmt.Sprintf("listing files in %s", dirname))
 
-	params := filePageParams{
-		AssetsPath: path.Join("/", config.Token, "/assets"),
-		UploadPath: path.Join("/", config.Token, "/upload"),
-		CurrentDir: path.Join(config.HomeDir, filename),
+	params := fileParams{
+		AssetsPath: path.Join(fh.baseUrl, "../assets"),
+		UploadPath: path.Join(fh.baseUrl, "/upload"),
+		CurrentDir: dirname,
 		Files:      []FileLink{},
 		Error:      error,
 	}
 
 	w.Header().Add("Content-Type", "text/html")
 
-	dirToList := filepath.Join(config.HomeDir, filepath.Clean(filename))
-
-	if !isPathSafe(dirToList) {
-		logger.Error(fmt.Sprintf("Declined to list files in %s as its not a subdir of %s", dirToList, config.HomeDir))
-		params.Error = "Unable to list directory outside of home dir."
-		return
-	}
-
-	f, err := os.Open(dirToList)
-	if err != nil {
-		params.Error = "Unable read directory"
-		if err := fileTemplate.Execute(w, params); err != nil {
-			logger.Error(fmt.Sprintf("%s", err))
-		}
-		return
-	}
-	defer f.Close()
-
-	files, err := f.Readdir(0)
+	files, err := os.ReadDir(dirname)
 	if err != nil {
 		params.Error = "Unable to list directory"
 		if err := fileTemplate.Execute(w, params); err != nil {
-			logger.Error(fmt.Sprintf("%s", err))
+			fh.logger.Error(fmt.Sprintf("%s", err))
 		}
 		return
 	}
 
-	// Link back to parent dir.
-	if filename != "." {
+	// if in a subdir, link back to parent directory
+	parent := filepath.Dir(dirname)
+
+	if dirname != filepath.Clean(fh.baseDir) {
 		params.Files = append(params.Files, FileLink{
 			Name:  "..",
-			Path:  path.Clean(path.Join(homePath, filename, "..")),
+			Link:  fh.asLink(parent),
 			IsDir: true,
 		})
 	}
@@ -127,7 +128,7 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 	for _, file := range files {
 		link := FileLink{
 			Name:  file.Name(),
-			Path:  path.Join(homePath, filename, file.Name()),
+			Link:  fh.asLink(path.Join(dirname, file.Name())),
 			IsDir: file.IsDir(),
 		}
 		params.Files = append(params.Files, link)
@@ -145,45 +146,45 @@ func listFiles(w http.ResponseWriter, filename string, error string) {
 
 	// Render the template.
 	if err := fileTemplate.Execute(w, params); err != nil {
-		logger.Error(fmt.Sprintf("%s", err))
+		fh.logger.Error(fmt.Sprintf("%s", err))
 	}
 }
 
 // Handles uploads by the container.
-func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
+func (fh FilesHandler) uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
-		fileError(w, "Method not allowed")
+		fh.fileError(w, "Method not allowed")
 		return
 	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		fileError(w, "Failed to parse multipart message")
+		logger.Error(fmt.Sprintf("Multipart upload failed: %s", err.Error()))
+		fh.fileError(w, "Failed to parse multipart message")
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		fileError(w, "Upload failed, invalid file")
+		fh.fileError(w, "Upload failed, invalid file")
 		return
 	}
 	defer file.Close()
 
-	if err := upload(file, header.Filename); err != nil {
-		fileError(w, err.Error())
+	if err := fh.upload(file, header.Filename); err != nil {
+		fh.fileError(w, err.Error())
 		return
 	}
 
 	// Reload the file page
-	homePath := path.Join("/", config.Token, "/home")
-	http.Redirect(w, r, homePath, http.StatusSeeOther)
+	http.Redirect(w, r, fh.baseUrl, http.StatusSeeOther)
 }
 
-func upload(file io.Reader, filename string) error {
+func (fh FilesHandler) upload(file io.Reader, filename string) error {
 
-	filePath := filepath.Join(config.HomeDir, filepath.Clean(filename))
+	filePath := filepath.Join(fh.baseDir, filepath.Clean(filename))
 
-	if !isPathSafe(filePath) {
+	if !fh.isPathSafe(filePath) {
 		return errors.New("file is outside of the homedir")
 	}
 
@@ -199,8 +200,8 @@ func upload(file io.Reader, filename string) error {
 	defer dst.Close()
 
 	// Ensure the file is owned by the shell user, not the server
-	if config.User != nil {
-		if err := chown(dst, config.User); err != nil {
+	if fh.user != nil {
+		if err := chown(dst, fh.user); err != nil {
 			return errors.New("upload failed, failed to create file for user")
 		}
 	}
@@ -212,6 +213,30 @@ func upload(file io.Reader, filename string) error {
 	return nil
 }
 
-func fileError(w http.ResponseWriter, error string) {
-	listFiles(w, ".", error)
+func (fh FilesHandler) fileError(w http.ResponseWriter, error string) {
+	params := errorParams{
+		AssetsPath: path.Join(fh.baseUrl, "../assets"),
+		Home:       fh.baseUrl,
+		Error:      error,
+	}
+
+	w.WriteHeader(http.StatusInternalServerError) // TODO: parameterize code
+	if err := errorTemplate.Execute(w, params); err != nil {
+		fh.logger.Error(fmt.Sprintf("%s", err))
+	}
+}
+
+func (fh FilesHandler) isPathSafe(filename string) bool {
+	return strings.HasPrefix(filepath.Clean(filename), filepath.Clean(fh.baseDir))
+}
+
+// Given an absolute path on the filesystem, return a url path
+func (fh FilesHandler) asLink(filename string) string {
+	// remove the basedir
+	rel, err := filepath.Rel(fh.baseDir, filename)
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(fh.baseUrl, rel)
 }

@@ -25,8 +25,10 @@ type Once struct {
 }
 
 func NewOnceMiddleware(cookiePath string) *Once {
+
+	secretId := generateId()
 	return &Once{
-		secretId:   generateId(),
+		secretId:   secretId,
 		keyUsed:    false,
 		cookiePath: cookiePath,
 	}
@@ -47,7 +49,7 @@ func (o *Once) once(h http.Handler) http.Handler {
 
 func (o Once) requireCookie(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
+		logger.Debug("checking cookie")
 		cookie, err := r.Cookie(sessionCookie)
 		if err != nil {
 			logger.Error(err.Error())
@@ -55,6 +57,7 @@ func (o Once) requireCookie(h http.Handler) http.Handler {
 			return
 		}
 
+		logger.Debug("cookie found")
 		if o.secretId != cookie.Value {
 			logger.Error("Cookie does not match session, unsetting cookie.")
 
@@ -66,10 +69,12 @@ func (o Once) requireCookie(h http.Handler) http.Handler {
 				HttpOnly: true,
 			}
 			http.SetCookie(w, expire)
-			http.Error(w, "Access Denied", http.StatusUnauthorized)
+
+			http.Error(w, "Access Denied.", http.StatusUnauthorized)
 			return
 		}
 
+		logger.Debug("cookie is valid")
 		h.ServeHTTP(w, r)
 	})
 }
@@ -79,6 +84,7 @@ func (o *Once) setCookie(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if !o.keyUsed {
+			logger.Debug("setting cookie")
 			cookie := &http.Cookie{
 				Name:     sessionCookie,
 				Value:    o.secretId,
@@ -87,6 +93,8 @@ func (o *Once) setCookie(h http.Handler) http.Handler {
 				HttpOnly: true,
 			}
 			http.SetCookie(w, cookie)
+		} else {
+			logger.Debug("not setting cookie")
 		}
 		h.ServeHTTP(w, r)
 	})

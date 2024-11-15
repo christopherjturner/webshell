@@ -10,7 +10,8 @@ var templateFS embed.FS
 
 // As with assets, templates are embedded in the binary.
 var (
-	termTemplate   = template.Must(template.ParseFS(templateFS, "templates/index.html"))
-	replayTemplate = template.Must(template.ParseFS(templateFS, "templates/replay.html"))
+	errorTemplate  = template.Must(template.ParseFS(templateFS, "templates/error.html"))
 	fileTemplate   = template.Must(template.ParseFS(templateFS, "templates/files.html"))
+	replayTemplate = template.Must(template.ParseFS(templateFS, "templates/replay.html"))
+	termTemplate   = template.Must(template.ParseFS(templateFS, "templates/index.html"))
 )

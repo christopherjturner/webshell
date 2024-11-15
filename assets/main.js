@@ -51,7 +51,7 @@ function init(shellPath) {
     }
 
     ws.onclose = function () {
-        terminal.write('\r\n\nconnection has been closed\n')
+        terminal.write('\r\n\nTerminal connection closed\r\n')
     }
 
     ws.onopen = function () {
@@ -64,7 +64,7 @@ function init(shellPath) {
             const rows = event.rows
             const cols = event.cols
 
-            console.log(`resizing ${rows} ${cols}`)
+            console.log(`resizing col:${cols} row:${rows}`)
             const msg = new TextEncoder().encode("\x01SIZE " + cols + " " + (rows + 1))
             ws.send(msg)
         }))
@@ -74,6 +74,7 @@ function init(shellPath) {
         window.onresize = debounce(function () {
             fitAddon.fit()
         })
+
     }
 
     const fileTab = document.getElementById('tab-2')

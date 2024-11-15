@@ -93,7 +93,12 @@ func buildRoutes() http.Handler {
 	var (
 		wsHandler       http.Handler = websocket.Handler(shellHandler)
 		termPageHandler http.Handler = termPageHandler(config.Token)
-		filesHandler    http.Handler = filesHandler()
+		filesHandler    http.Handler = FilesHandler{
+			baseDir: config.HomeDir,
+			baseUrl: rootPath + "home",
+			user:    config.User,
+			logger:  logger,
+		}.Handler()
 	)
 
 	o := NewOnceMiddleware(rootPrefix)
