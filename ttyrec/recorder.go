@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -14,85 +13,78 @@ type TTYRecorder interface {
 }
 
 type Recorder struct {
-	ttyFile   *os.File
-	timeFile  *os.File
+	auditFile *os.File
+	timings   []Timing
+
 	lastWrite int64
-	offset    int
+	auditSize int
 	precision int64
 	enabled   bool
-	auditDir  string
-	auditFile string
 }
 
-func NewRecorder(auditDir, auditFile string) (*Recorder, error) {
+func NewRecorder(filename string) (*Recorder, error) {
 
-	err := os.MkdirAll(auditDir, 0600)
+	auditFile, err := os.Create(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	ttyFile, err := os.CreateTemp(auditDir, "ttyrec.data")
-	if err != nil {
-		return nil, err
-	}
-
-	timeFile, err := os.CreateTemp(auditDir, "ttyrec.time")
-	if err != nil {
+	// Reserve header space at the start of file.
+	if err := binary.Write(auditFile, binary.LittleEndian, Header{}); err != nil {
 		return nil, err
 	}
 
 	rec := &Recorder{
-		ttyFile:   ttyFile,
-		timeFile:  timeFile,
 		precision: 100,
 		enabled:   true,
-		auditDir:  auditDir,
 		auditFile: auditFile,
 	}
-
 	return rec, nil
 }
 
 func (r *Recorder) Save() error {
 
-	outfile, err := os.Create(filepath.Join(r.auditDir, r.auditFile))
-	if err != nil {
-		return err
-	}
-
+	// Stop any writes while save is in progress
 	r.enabled = false
-
-	ttyFile, err := os.Open(r.ttyFile.Name())
+	err := r.auditFile.Close()
 	if err != nil {
 		return err
 	}
-	defer ttyFile.Close()
 
-	timeFile, err := os.Open(r.timeFile.Name())
+	// Reopen file
+	f, err := os.OpenFile(r.auditFile.Name(), os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}
-	defer timeFile.Close()
+	defer r.auditFile.Close()
 
-	return Save(outfile, ttyFile, timeFile)
+	// Append timing data to the end.
+	f.Seek(0, io.SeekEnd)
+	if err = binary.Write(f, binary.LittleEndian, r.timings); err != nil && err != io.EOF {
+		return err
+	}
+
+	// Update header with new offsets.
+	auditOffset := int64(binary.Size(Header{}))
+	header := Header{
+		Magic:        MAGIC,
+		Version:      VERSION,
+		AuditOffset:  auditOffset,
+		AuditLength:  int64(r.auditSize),
+		TimingOffset: auditOffset + int64(r.auditSize),
+		TimingLength: int64(binary.Size(r.timings)),
+	}
+
+	f.Seek(0, io.SeekStart)
+	if err = binary.Write(f, binary.LittleEndian, &header); err != nil && err != io.EOF {
+		return err
+	}
+
+	return f.Close()
 }
 
 func (r Recorder) Close() error {
-	errTty := r.ttyFile.Close()
-	errTime := r.timeFile.Close()
-
-	_ = os.Remove(r.ttyFile.Name())
-	_ = os.Remove(r.timeFile.Name())
-
-	if errTty != nil {
-		return errTty
-	}
-
-	if errTime != nil {
-		return errTime
-	}
-
-	return nil
+	return r.auditFile.Close()
 }
 
 func (r *Recorder) Write(b []byte) (int, error) {
@@ -101,13 +93,11 @@ func (r *Recorder) Write(b []byte) (int, error) {
 		return 0, nil
 	}
 
-	// Write to audit temp file.
-	n, err := r.ttyFile.Write(b)
+	n, err := r.auditFile.Write(b)
 	if err != nil {
 		return n, err
 	}
 
-	// Write to timing temp file.
 	thisWrite := time.Now().UnixMilli()
 	if r.lastWrite == 0 {
 		r.lastWrite = thisWrite
@@ -117,17 +107,14 @@ func (r *Recorder) Write(b []byte) (int, error) {
 	if (thisWrite - r.lastWrite) > r.precision {
 		r.lastWrite = thisWrite
 		timing := Timing{
-			Offset: int64(r.offset),
+			Offset: int64(r.auditSize),
 			Time:   thisWrite,
 		}
-		err = binary.Write(r.timeFile, binary.LittleEndian, timing)
-		if err != nil {
-			return n, err
-		}
-
+		r.timings = append(r.timings, timing)
 	}
 
-	r.offset += n
+	r.auditSize += n
+
 	return n, nil
 }
 

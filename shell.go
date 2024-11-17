@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -77,10 +78,6 @@ func shellHandler(ws *websocket.Conn) {
 		return
 	}
 
-	activeConnections.Add(1)
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	// TTY Recorder
 	// When TTY Recorder is disabled we use a non-functioning version of it in its place.
 	// Avoids having to scatter if statements all of the place etc.
@@ -89,7 +86,7 @@ func shellHandler(ws *websocket.Conn) {
 	if config.AuditTTY {
 		// TTY recordings are written down to "<token>-<pid>.audit".
 		auditFile := fmt.Sprintf("%s_%d.tty.audit", config.Token, cmd.Process.Pid)
-		recorder, err = ttyrec.NewRecorder(config.AuditPath, auditFile)
+		recorder, err = ttyrec.NewRecorder(filepath.Join(config.AuditPath, auditFile))
 		if err != nil {
 			logger.Error(fmt.Sprintf("TTYRec failed to start: %v", err))
 			return
@@ -110,6 +107,10 @@ func shellHandler(ws *websocket.Conn) {
 
 		logger.Info("Syscall auditing is enabled")
 	}
+
+	activeConnections.Add(1)
+	var wg sync.WaitGroup
+	wg.Add(1)
 
 	// Gracefully stop the session
 	defer func() {

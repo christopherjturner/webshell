@@ -35,7 +35,6 @@ type TTYRecording struct {
 	Header  Header
 	Audit   *io.SectionReader
 	Timings []Timing
-	// TODO: keep ref to underlying file
 }
 
 type ReaderAtCloser interface {
@@ -60,10 +59,15 @@ func Load(r ReaderAtCloser) (*TTYRecording, error) {
 		return nil, fmt.Errorf("invalid file, invalid header ID %d", rec.Header.Magic)
 	}
 
-	if rec.Header.Version != VERSION {
+	switch rec.Header.Version {
+	case 0x01:
+		return loadV1(r, rec)
+	default:
 		return nil, fmt.Errorf("unsupport recording version %d", rec.Header.Version)
 	}
+}
 
+func loadV1(r ReaderAtCloser, rec *TTYRecording) (*TTYRecording, error) {
 	if rec.Header.AuditOffset > 0 && rec.Header.AuditLength > 0 {
 		rec.Audit = io.NewSectionReader(r, rec.Header.AuditOffset, rec.Header.AuditLength)
 	}
@@ -73,8 +77,9 @@ func Load(r ReaderAtCloser) (*TTYRecording, error) {
 		rec.Timings = make([]Timing, numberOfTimings)
 
 		tr := io.NewSectionReader(r, rec.Header.TimingOffset, rec.Header.TimingLength)
-		if err := binary.Read(tr, binary.LittleEndian, &rec.Timings); err != nil {
-			return nil, err
+		if err := binary.Read(tr, binary.LittleEndian, &rec.Timings); err != nil && err != io.EOF {
+			fmt.Printf("%v\n", rec)
+			return nil, fmt.Errorf("failed to load timings: %v", err)
 		}
 
 		// Add extra end-of-file timing
@@ -85,45 +90,4 @@ func Load(r ReaderAtCloser) (*TTYRecording, error) {
 	}
 
 	return rec, nil
-}
-
-func Save(dest io.WriteSeeker, audit io.Reader, timings io.Reader) error {
-
-	header := Header{
-		Magic:   MAGIC,
-		Version: VERSION,
-	}
-
-	// Write the header, we will come back and fill in the missing values at the end
-	err := binary.Write(dest, binary.LittleEndian, header)
-	if err != nil {
-		return err
-	}
-
-	// Write the audit file
-	w, err := io.Copy(dest, audit)
-	if err != nil {
-		return err
-	}
-
-	header.AuditOffset = int64(binary.Size(header))
-	header.AuditLength = w
-
-	// Write the timings
-	w, err = io.Copy(dest, timings)
-	if err != nil {
-		return err
-	}
-
-	header.TimingOffset = int64(header.AuditOffset + header.AuditLength)
-	header.TimingLength = w
-
-	// Update the header
-	dest.Seek(0, 0)
-	err = binary.Write(dest, binary.LittleEndian, header)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
