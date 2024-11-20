@@ -10,8 +10,7 @@ body {
 
 #terminal {
     min-height: 96vh;
-    padding-left: 10px;
-    padding-bottom: 10px;
+    padding: 10px;
     background: #000;
 }
 
