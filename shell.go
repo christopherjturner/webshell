@@ -187,4 +187,5 @@ func (s Shell) shellHandler(ws *websocket.Conn, shellProc *ShellProcess) {
 	}()
 
 	wg.Wait()
+	println("webshell handler is done")
 }
