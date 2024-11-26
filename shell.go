@@ -4,18 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
-	"os/user"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 	"golang.org/x/net/websocket"
 
-	"webshell/strace"
 	"webshell/ttyrec"
 )
 
@@ -24,130 +21,79 @@ const (
 	maxBufferSizeBytes = 1024 * 256
 )
 
-var restrictedEnvVars = map[string]bool{
-	"AUDIT_UPLOAD_URL": true,
+type Shell struct {
+	config  Config
+	timeout Timeout
 }
 
-// Sets a command to run as a different user.
-func runAs(cmd *exec.Cmd, user *user.User) {
-	uid, _ := strconv.ParseInt(user.Uid, 10, 32)
-	gid, _ := strconv.ParseInt(user.Gid, 10, 32)
+func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
-	cmd.Env = append(cmd.Env, fmt.Sprintf("HOME=%s", user.HomeDir))
-}
+	// Start shell process
+	shellProcess := &ShellProcess{}
+	err := shellProcess.Start(shell)
+	if err != nil {
+		logger.Error(err.Error())
+		return
+	}
 
-// Removes any restricted keys from the parent environment
-func filterEnv(o []string) []string {
-	environ := []string{}
-	for _, e := range o {
-		key, _, _ := strings.Cut(e, "=")
-		if _, found := restrictedEnvVars[key]; !found {
-			environ = append(environ, e)
+	// Attach auditing if required
+	if s.config.AuditTTY {
+		timestamp := time.Now().Format(time.RFC3339)
+		auditFile := fmt.Sprintf("%s_%s.tty.audit", timestamp, s.config.Token)
+		recorder, err := ttyrec.NewRecorder(s.config.AuditPath, auditFile)
+		if err != nil {
+			logger.Error(err.Error())
+			http.Error(w, "Audit setup failed", http.StatusInternalServerError)
+			return
+		}
+		shellProcess.WithTTYRecorder(recorder)
+		logger.Info(fmt.Sprintf("Recording TTY data to %s/%s", s.config.AuditPath, auditFile))
+		defer recorder.Save()
+	}
+
+	if s.config.AuditExec {
+		if err := shellProcess.WithAuditing(); err != nil {
+			logger.Error(err.Error())
+			http.Error(w, "Audit setup failed", http.StatusInternalServerError)
+			return
 		}
 	}
-	return environ
+
+	// Pass to websocket handler
+	s.timeout.Start()
+	h := websocket.Handler(func(c *websocket.Conn) { s.shellHandler(c, shellProcess) })
+	h.ServeHTTP(w, r)
 }
 
 // WebShell's websocket handler
-func shellHandler(ws *websocket.Conn) {
+func (s Shell) shellHandler(ws *websocket.Conn, shellProc *ShellProcess) {
 
-	logger.Info("New webshell session started")
+	logger.Info("New webshell session")
 
 	ctxLocal, cancelLocal := context.WithCancel(ws.Request().Context())
 	defer cancelLocal()
 
-	var err error
-
-	// Start the shell
-	cmd := exec.Command(shell)
-	cmd.Env = filterEnv(os.Environ())
-	cmd.Dir = config.HomeDir
-
-	if config.User != nil {
-		logger.Info(fmt.Sprintf("Running %s as %s", shell, config.User.Username))
-		runAs(cmd, config.User)
-	}
-
-	tty, err := pty.Start(cmd)
-	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to start %s: %s", shell, err))
-		websocket.Message.Send(ws, "Failed to start shell")
-		return
-	}
-
-	activeConnections.Add(1)
 	var wg sync.WaitGroup
 	wg.Add(1)
-
-	// TTY Recorder
-	// When TTY Recorder is disabled we use a non-functioning version of it in its place.
-	// Avoids having to scatter if statements all of the place etc.
-	var recorder ttyrec.TTYRecorder = &ttyrec.NoOpRecorder{}
-
-	if config.AuditTTY {
-		// TTY recordings are written down to "<token>-<pid>.audit".
-		auditFile := fmt.Sprintf("%s_%d.tty.audit", config.Token, cmd.Process.Pid)
-		recorder, err = ttyrec.NewRecorder(config.AuditPath, auditFile)
-		if err != nil {
-			logger.Error(fmt.Sprintf("TTYRec failed to start: %v", err))
-			return
-		}
-
-		logger.Info("TTY auditing is enabled")
-	}
-
-	// Syscall Exec auditing
-	// Requires strace to be installed.
-	// AuditExec will error if its enabled and strace is not found.
-	if config.AuditExec {
-		straceAudit := strace.NewStraceLogger(auditLogger)
-		if err := straceAudit.Attach(cmd.Process.Pid); err != nil {
-			logger.Error(fmt.Sprintf("Syscall auditing failed to start: %v", err))
-			return
-		}
-
-		logger.Info("Syscall auditing is enabled")
-	}
+	activeConnections.Add(1)
+	defer activeConnections.Done()
 
 	// Gracefully stop the session
 	defer func() {
-		logger.Info(fmt.Sprintf("Stopping shell PID %d", cmd.Process.Pid))
-		if err := cmd.Process.Kill(); err != nil {
-			logger.Error(fmt.Sprintf("Failed to stop process: %s", err))
+		logger.Info("Stopping webshell")
+		if err := shellProc.Kill(); err != nil {
+			logger.Error("Failed to kill shell process")
 		}
-
-		if _, err := cmd.Process.Wait(); err != nil {
-			logger.Error(fmt.Sprintf("Failed to wait process: %s", err))
-		}
-
-		if err := tty.Close(); err != nil {
-			logger.Error(fmt.Sprintf("Failed to close tty: %s", err))
-		}
-
 		if err := ws.Close(); err != nil {
 			logger.Error(fmt.Sprintf("Failed to close websocket: %s", err))
 		}
-
-		// Save the TTY recording.
-		if err := recorder.Save(); err != nil {
-			logger.Error(fmt.Sprintf("Failed to save ttyrec: %s", err))
-		}
-		logger.Info("Audit file written")
-
-		if err := recorder.Close(); err != nil {
-			logger.Error(fmt.Sprintf("Failed to close TTYRecorder: %s", err))
-		}
-		activeConnections.Done()
 	}()
 
 	// Shell -> User
 	go func() {
 		buffer := make([]byte, maxBufferSizeBytes)
-
 		for {
-			l, err := tty.Read(buffer)
+			l, err := shellProc.Read(buffer)
 			if err != nil {
 				websocket.Message.Send(ws, "session ended")
 				wg.Done()
@@ -156,18 +102,9 @@ func shellHandler(ws *websocket.Conn) {
 
 			if err := websocket.Message.Send(ws, buffer[:l]); err != nil {
 				logger.Error("Failed to forward tty to ws")
-				continue
-			}
-
-			// Copy data to TTY Recorder.
-			// TODO: maybe use a TeeReader instead
-			if _, err := recorder.Write(buffer[:l]); err != nil {
-				logger.Error("Failed record tty to ws")
-				continue
 			}
 		}
-
-		// Close the socket, this will stop User -> Shell
+		// Close the websocket, this unblocks and kills the User -> Shell go routine
 		_ = ws.Close()
 	}()
 
@@ -175,12 +112,13 @@ func shellHandler(ws *websocket.Conn) {
 	go func() {
 		buffer := make([]byte, maxBufferSizeBytes)
 		for {
-			if err = websocket.Message.Receive(ws, &buffer); err != nil {
+			if err := websocket.Message.Receive(ws, &buffer); err != nil {
 				logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
 				break
 			}
-
 			b := bytes.Trim(buffer, "\x00")
+
+			s.timeout.Ping()
 
 			// Special purpose payloads.
 			if b[0] == 1 {
@@ -208,28 +146,27 @@ func shellHandler(ws *websocket.Conn) {
 
 					logger.Debug(fmt.Sprintf("Resizing tty to use %d rows and %d columns...", rows, cols))
 
-					if err := pty.Setsize(tty, &pty.Winsize{
+					if err := pty.Setsize(shellProc.tty, &pty.Winsize{
 						Rows: uint16(rows),
 						Cols: uint16(cols),
 					}); err != nil {
 						logger.Warn(fmt.Sprintf("Failed to resize tty, error: %s", err))
 					}
-
 					continue
 				}
 
 				logger.Info("Unknown special payload " + specialPayload)
 			}
 
-			// Forward to the process.
-			_, err := tty.Write(b)
+			// Send user input to shell process
+			_, err := shellProc.Write(b)
 			if err != nil {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 		}
 
-		// Kill the shell, this will stop the Shell -> User routine
-		cmd.Process.Kill()
+		// Kill the shell, this will stop the Shell -> User go routine
+		shellProc.Kill()
 	}()
 
 	// Stop the handler if the global context is cancelled
@@ -237,11 +174,18 @@ func shellHandler(ws *websocket.Conn) {
 		select {
 		case <-globalCtx.Done():
 			logger.Debug("Cancelling Websocket Handler")
-			_ = ws.Close()
+			if err := shellProc.Kill(); err != nil {
+				logger.Error(err.Error())
+			}
+			if err := ws.Close(); err != nil {
+				logger.Error(err.Error())
+			}
 			return
 		case <-ctxLocal.Done():
+			logger.Info("Request Cancelled")
 		}
 	}()
 
 	wg.Wait()
+	println("webshell handler is done")
 }

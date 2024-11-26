@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"strconv"
+	"time"
 )
 
 type Config struct {
@@ -20,6 +21,7 @@ type Config struct {
 	AuditExec  bool
 	Replay     bool
 	ReplayFile string
+	Grace      time.Duration
 }
 
 func LoadConfig() Config {
@@ -28,21 +30,28 @@ func LoadConfig() Config {
 
 	debug := flag.Bool("debug", false, "Debug level logging")
 
-	flag.BoolVar(&cfg.Once, "once", false, "Single use service, only accepts one connection")
 	flag.IntVar(&cfg.Port, "port", 8080, "Port to listen on")
 	flag.StringVar(&cfg.HomeDir, "home", homeDir, "Home directory for file access")
 	flag.StringVar(&cfg.Token, "token", "no-token", "Token to access service")
+	username := flag.String("user", "", "User to run shell as")
 
+	// Only allows the first unique user to connect to the shell. When they disconnect the server will exit.
+	flag.BoolVar(&cfg.Once, "once", false, "Single use service, only accepts one connection")
+
+	// Grace period for once mode, how long do we give the user to reconnect if their connection drops.
+	// This uses user input and the ping message from the term to work out what's active. If we set this too short
+	// its possible to kill the server while a user is connected. Default ping interval is 5s.
+	graceSecs := flag.Int("grace", 20, "Seconds to wait after disconnecting before stopping server. Used with -once.")
+
+	// Turns on various auditing capabilities.
 	flag.BoolVar(&cfg.AuditTTY, "audit-tty", false, "Record users tty session for auditing")
 	flag.BoolVar(&cfg.AuditExec, "audit-exec", false, "Record all commands executed by user")
 	flag.StringVar(&cfg.AuditPath, "audit-path", "/tmp", "Directory to write audit logs to")
+	audit := flag.Bool("audit", false, "Enabled all auditing")
 
 	// Replayer is still work-in-progress
 	flag.BoolVar(&cfg.Replay, "replay", false, "Enabled replay of audit files")
 	flag.StringVar(&cfg.ReplayFile, "replay-file", "", "Path to audit file to replay")
-
-	audit := flag.Bool("audit", false, "Enabled all auditing")
-	username := flag.String("user", "", "User to run shell as")
 
 	flag.Parse()
 
@@ -68,6 +77,8 @@ func LoadConfig() Config {
 	if *debug {
 		cfg.LogLevel.Set(slog.LevelDebug)
 	}
+
+	cfg.Grace = time.Duration(*graceSecs) * time.Second
 
 	return cfg
 }

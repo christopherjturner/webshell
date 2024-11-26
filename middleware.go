@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 )
 
 const sessionCookie = "cdpwebshell"
+
+var connCount int
 
 // Middleware to log inbound requests.
 func requestLogger(h http.Handler) http.Handler {
@@ -25,7 +26,6 @@ type Once struct {
 }
 
 func NewOnceMiddleware(cookiePath string) *Once {
-
 	secretId := generateId()
 	return &Once{
 		secretId:   secretId,
@@ -37,13 +37,20 @@ func NewOnceMiddleware(cookiePath string) *Once {
 // Allow only one connection and stop the server when its closed.
 func (o *Once) once(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if o.keyUsed {
+
+		cookie, err := r.Cookie(sessionCookie)
+		if err != nil {
+			logger.Error(err.Error())
+			http.Error(w, "Access Denied", http.StatusUnauthorized)
+			return
+		}
+
+		if cookie.Value != o.secretId {
 			http.Error(w, "expired", http.StatusUnauthorized)
 			return
 		}
-		o.keyUsed = true
+
 		h.ServeHTTP(w, r)
-		os.Exit(0)
 	})
 }
 
@@ -82,7 +89,6 @@ func (o Once) requireCookie(h http.Handler) http.Handler {
 // Sets a one-time cookie as part of the -once restrictions.
 func (o *Once) setCookie(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		if !o.keyUsed {
 			logger.Debug("setting cookie")
 			cookie := &http.Cookie{
@@ -93,6 +99,7 @@ func (o *Once) setCookie(h http.Handler) http.Handler {
 				HttpOnly: true,
 			}
 			http.SetCookie(w, cookie)
+			o.keyUsed = true
 		} else {
 			logger.Debug("not setting cookie")
 		}
