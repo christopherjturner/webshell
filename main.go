@@ -77,6 +77,7 @@ func main() {
 	logger.Info("Waiting for handlers to exit")
 	cancelFunc()
 	activeConnections.Wait()
+	logger.Info("All connections closed")
 }
 
 // Minimal healthcheck endpoint.
@@ -88,10 +89,13 @@ func buildRoutes() http.Handler {
 
 	rootPrefix := "/" + config.Token
 	rootPath := rootPrefix + "/"
+	var timeout Timeout = &NoOpTimeout{}
+	if config.Once {
+		timeout = NewInactivityTimeout(globalCtx, config.Grace)
+	}
 
-	// Add middleware to websocket handler.
 	var (
-		wsHandler       http.Handler = websocket.Handler(shellHandler)
+		wsHandler       http.Handler = Shell{config, timeout}
 		termPageHandler http.Handler = termPageHandler(config.Token)
 		filesHandler    http.Handler = FilesHandler{
 			baseDir: config.HomeDir,
@@ -101,8 +105,10 @@ func buildRoutes() http.Handler {
 		}.Handler()
 	)
 
-	o := NewOnceMiddleware(rootPrefix)
+	// Add middleware to websocket handler.
 	if config.Once {
+		timeout = NewInactivityTimeout(globalCtx, config.Grace)
+		o := NewOnceMiddleware(rootPrefix)
 		wsHandler = o.once(wsHandler)
 		termPageHandler = o.setCookie(termPageHandler)
 		filesHandler = o.requireCookie(filesHandler)
