@@ -41,7 +41,7 @@ func LoadConfig() Config {
 	// Grace period for once mode, how long do we give the user to reconnect if their connection drops.
 	// This uses user input and the ping message from the term to work out what's active. If we set this too short
 	// its possible to kill the server while a user is connected. Default ping interval is 5s.
-	graceSecs := flag.Int("grace", 20, "Seconds to wait after disconnecting before stopping server. Used with -once.")
+	graceSecs := flag.Int("grace", 30, "Seconds to wait after disconnecting before stopping server. Used with -once.")
 
 	// Turns on various auditing capabilities.
 	flag.BoolVar(&cfg.AuditTTY, "audit-tty", false, "Record users tty session for auditing")
