@@ -14,6 +14,8 @@ function reloadFiles() {
     frame.src = frame.src
 }
 
+
+var fitAddon
 function init(shellPath) {
     terminal = new Terminal({
         screenKeys: true,
@@ -31,11 +33,12 @@ function init(shellPath) {
     const url = protocol + location.host + shellPath
     ws = new WebSocket(url)
     const attachAddon = new AttachAddon.AttachAddon(ws)
-    const fitAddon = new FitAddon.FitAddon()
+    fitAddon = new FitAddon.FitAddon()
 
+    const terminalDiv = document.getElementById("terminal")
     terminal.loadAddon(attachAddon)
     terminal.loadAddon(fitAddon)
-    terminal.open(document.getElementById("terminal"))
+    terminal.open(terminalDiv)
     terminal._initialized = true
 
     function ping() {
@@ -56,26 +59,33 @@ function init(shellPath) {
 
     ws.onopen = function () {
         terminal.focus()
-        setTimeout(function () {
-            fitAddon.fit()
-        })
+        setTimeout(resizeTerm)
 
-        terminal.onResize(debounce(function (event) {
-            const rows = event.rows
+        terminal.onResize(function (event) {
+            const rows = event.rows -1
             const cols = event.cols
 
             console.log(`resizing col:${cols} row:${rows}`)
             const msg = new TextEncoder().encode("\x01SIZE " + cols + " " + (rows + 1))
             ws.send(msg)
-        }))
-
-        ping()
-
-        window.onresize = debounce(function () {
-            fitAddon.fit()
         })
 
+        ping()
     }
+
+
+    function resizeTerm() {
+        requestAnimationFrame(() => {
+            const height = window.innerHeight;
+            document.body.style.height = height + 'px'
+        })
+        requestAnimationFrame(() => {
+            fitAddon.fit()
+            console.log("window resized " + window.innerHeight + " div " +  document.getElementById("terminal").style.height)
+        });
+    }
+
+    window.onresize = (resizeTerm)
 
     const fileTab = document.getElementById('tab-2')
     if(fileTab) {

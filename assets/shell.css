@@ -6,16 +6,17 @@ body {
     margin: 0;
     padding: 0;
     font-family: monospace;
+    overflow: hidden;
 }
 
 #terminal {
-    min-height: 96vh;
-    padding: 10px;
+    height: 98%;
     background: #000;
 }
 
 .terminal-container{
     overflow: hidden;
+    height: 100%;
 }
 
 .xterm .xterm-viewport {
@@ -32,6 +33,7 @@ body {
 }
 
 .tabs-container {
+    height: 100%;
     display: flex;
     flex-wrap: wrap;
 }
@@ -53,11 +55,13 @@ body {
     color: white;
     background-color: darkslategray;
     font-size: 1.2em;
+    max-height: 3em;
 }
 
 .tab-content {
     order: 99;
     width: 100%;
+    height: 100%;
     display: block;
     background-color: #000;
 }
