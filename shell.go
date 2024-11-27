@@ -116,9 +116,13 @@ func (s Shell) shellHandler(ws *websocket.Conn, shellProc *ShellProcess) {
 				logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
 				break
 			}
+			s.timeout.Ping()
+
 			b := bytes.Trim(buffer, "\x00")
 
-			s.timeout.Ping()
+			if len(b) == 0 {
+				continue
+			}
 
 			// Special purpose payloads.
 			if b[0] == 1 {
