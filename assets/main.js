@@ -66,7 +66,7 @@ function init(shellPath) {
             const cols = event.cols
 
             console.log(`resizing col:${cols} row:${rows}`)
-            const msg = new TextEncoder().encode("\x01SIZE " + cols + " " + (rows + 1))
+            const msg = new TextEncoder().encode("\x01SIZE " + cols + " " + rows)
             ws.send(msg)
         })
 
@@ -85,7 +85,7 @@ function init(shellPath) {
         });
     }
 
-    window.onresize = (resizeTerm)
+    window.onresize = debounce(resizeTerm)
 
     const fileTab = document.getElementById('tab-2')
     if(fileTab) {
