@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/creack/pty"
-	"golang.org/x/net/websocket"
 
 	"webshell/ttyrec"
 )
@@ -28,9 +28,16 @@ type Shell struct {
 
 func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	// Accept the WS connection
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{})
+	if err != nil {
+		logger.Error(err.Error())
+		return
+	}
+
 	// Start shell process
 	shellProcess := &ShellProcess{}
-	err := shellProcess.Start(shell)
+	err = shellProcess.Start(shell)
 	if err != nil {
 		logger.Error(err.Error())
 		return
@@ -61,16 +68,16 @@ func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Pass to websocket handler
 	s.timeout.Start()
-	h := websocket.Handler(func(c *websocket.Conn) { s.shellHandler(c, shellProcess) })
-	h.ServeHTTP(w, r)
+	s.shellHandler(r.Context(), conn, shellProcess)
+
 }
 
 // WebShell's websocket handler
-func (s Shell) shellHandler(ws *websocket.Conn, shellProc *ShellProcess) {
+func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellProc *ShellProcess) {
 
 	logger.Info("New webshell session")
 
-	ctxLocal, cancelLocal := context.WithCancel(ws.Request().Context())
+	ctxLocal, cancelLocal := context.WithCancel(ctxReq)
 	defer cancelLocal()
 
 	var wg sync.WaitGroup
@@ -84,41 +91,50 @@ func (s Shell) shellHandler(ws *websocket.Conn, shellProc *ShellProcess) {
 		if err := shellProc.Kill(); err != nil {
 			logger.Error("Failed to kill shell process")
 		}
-		if err := ws.Close(); err != nil {
+		if err := ws.Close(websocket.StatusGoingAway, "Server is stopping"); err != nil {
 			logger.Error(fmt.Sprintf("Failed to close websocket: %s", err))
 		}
 	}()
 
 	// Shell -> User
 	go func() {
+		defer wg.Done()
+
 		buffer := make([]byte, maxBufferSizeBytes)
 		for {
 			l, err := shellProc.Read(buffer)
 			if err != nil {
-				websocket.Message.Send(ws, "session ended")
-				wg.Done()
+				ws.Write(ctxLocal, websocket.MessageText, []byte("Session Ended"))
 				break
 			}
 
-			if err := websocket.Message.Send(ws, buffer[:l]); err != nil {
+			if err := ws.Write(ctxLocal, websocket.MessageText, buffer[:l]); err != nil {
 				logger.Error("Failed to forward tty to ws")
 			}
 		}
+
 		// Close the websocket, this unblocks and kills the User -> Shell go routine
-		_ = ws.Close()
+		// _ = ws.Close() // todo again do we need to now?
 	}()
 
 	// User -> Shell
 	go func() {
-		buffer := make([]byte, maxBufferSizeBytes)
+
+		// Kill the shell when the reader exits. TODO: can do move this outside the go routines?
+		defer shellProc.Kill()
+
 		for {
-			if err := websocket.Message.Receive(ws, &buffer); err != nil {
+			typ, b, err := ws.Read(ctxLocal)
+			if err != nil {
 				logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
 				break
 			}
 			s.timeout.Ping()
 
-			b := bytes.Trim(buffer, "\x00")
+			fmt.Printf("msg type %v\n", typ)
+			fmt.Printf("msg %s\n", string(b))
+
+			b = bytes.Trim(b, "\x00")
 
 			if len(b) == 0 {
 				continue
@@ -163,14 +179,12 @@ func (s Shell) shellHandler(ws *websocket.Conn, shellProc *ShellProcess) {
 			}
 
 			// Send user input to shell process
-			_, err := shellProc.Write(b)
+			_, err = shellProc.Write(b)
 			if err != nil {
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 		}
 
-		// Kill the shell, this will stop the Shell -> User go routine
-		shellProc.Kill()
 	}()
 
 	// Stop the handler if the global context is cancelled
@@ -181,7 +195,7 @@ func (s Shell) shellHandler(ws *websocket.Conn, shellProc *ShellProcess) {
 			if err := shellProc.Kill(); err != nil {
 				logger.Error(err.Error())
 			}
-			if err := ws.Close(); err != nil {
+			if err := ws.CloseNow(); err != nil {
 				logger.Error(err.Error())
 			}
 			return

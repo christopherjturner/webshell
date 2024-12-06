@@ -2,13 +2,32 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"golang.org/x/net/websocket"
+	"net/http"
 	"sync"
 	"webshell/ttyrec"
+
+	"github.com/coder/websocket"
 )
 
+type Replayer struct{}
+
+func (rp Replayer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Accept the WS connection
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{})
+	if err != nil {
+		logger.Error(err.Error())
+		return
+	}
+
+	replayHandler(conn)
+}
+
 func replayHandler(ws *websocket.Conn) {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	logger.Info("Replaying session")
 	var err error
@@ -27,7 +46,11 @@ func replayHandler(ws *websocket.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	wsWriter := WsWriter{ws: ws}
+	wsWriter, err := ws.Writer(ctx, websocket.MessageBinary)
+	if err != nil {
+		logger.Error(err.Error())
+		return
+	}
 
 	// temp
 	go func() {
@@ -35,14 +58,15 @@ func replayHandler(ws *websocket.Conn) {
 	}()
 
 	go func() {
-		buffer := make([]byte, maxBufferSizeBytes)
+
 		for {
-			if err = websocket.Message.Receive(ws, &buffer); err != nil {
+			_, b, err := ws.Read(ctx)
+			if err != nil {
 				logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
 				break
 			}
 
-			b := bytes.Trim(buffer, "\x00")
+			b = bytes.Trim(b, "\x00")
 
 			// Handle resize message from the terminal.
 			if b[0] == 1 {
@@ -70,16 +94,4 @@ func replayHandler(ws *websocket.Conn) {
 	}()
 
 	wg.Wait()
-}
-
-type WsWriter struct {
-	ws *websocket.Conn
-}
-
-func (w WsWriter) Write(b []byte) (int, error) {
-	err := websocket.Message.Send(w.ws, b)
-	if err != nil {
-		return 0, err
-	}
-	return len(b), err
 }
