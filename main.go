@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,6 +31,10 @@ var (
 	activeConnections sync.WaitGroup
 )
 
+func connTrack(conn net.Conn, state http.ConnState) {
+	fmt.Printf("conn state change %v\n", state)
+}
+
 func main() {
 
 	globalCtx, cancelFunc = context.WithCancel(context.Background())
@@ -46,6 +51,7 @@ func main() {
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
+		ConnState:      connTrack,
 	}
 
 	// Handle shutdown signals.

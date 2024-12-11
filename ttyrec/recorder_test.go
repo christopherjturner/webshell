@@ -1,6 +1,8 @@
 package ttyrec
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
@@ -20,9 +22,10 @@ func TestSaveAndLoadRecording(t *testing.T) {
 	}
 	rec.precision = -1
 
-	// Write test data to recorder.
-	rec.Write([]byte("test data\n"))
-	rec.Write([]byte("exit\n"))
+	// Write the test data down in two writes
+	testData := []byte("test data 111 2222 4444 11111111111111111111111111111111111111111111111111111111111111111111111111111111111")
+	rec.Write(testData[:25])
+	rec.Write(testData[25:])
 
 	// Save recording.
 	err = rec.Save()
@@ -47,19 +50,25 @@ func TestSaveAndLoadRecording(t *testing.T) {
 		t.Errorf("auditOffset is wrong. want %d got %d", 40, audit.Header.AuditOffset)
 	}
 
-	if audit.Header.AuditLength != 15 {
-		t.Errorf("auditLength is wrong. want %d got %d", 15, audit.Header.AuditLength)
+	if audit.Header.AuditLength > int64(len(testData)) {
+		t.Errorf("auditLength is wrong.  %d >  %d", audit.Header.AuditLength, len(testData))
 	}
 
-	auditData, err := io.ReadAll(audit.Audit)
+	gzr, err := gzip.NewReader(audit.Audit)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	auditData, err := io.ReadAll(gzr)
 	if err != nil {
 		t.Errorf("failed to read audit data: %v", err)
 	}
 
-	if string(auditData) != "test data\nexit\n" {
-		t.Errorf("audit data was wrong, got %s", auditData)
+	if !bytes.Equal(auditData, testData) {
+		t.Errorf("audit data was wrong:  \nwant %s  \ngot  %s", string(testData), string(auditData))
 	}
 
+	// Expect 1 timing per write + 1 to mark the end.
 	if len(audit.Timings) != 3 {
 		t.Errorf("wrong number of timings, wanted 3, got %d", len(audit.Timings))
 	}
