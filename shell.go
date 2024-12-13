@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -91,15 +92,13 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 		if err := shellProc.Kill(); err != nil {
 			logger.Error("Failed to kill shell process")
 		}
-		if err := ws.Close(websocket.StatusGoingAway, "Server is stopping"); err != nil {
+		if err := ws.Close(websocket.StatusNormalClosure, "Connection closed"); err != nil {
 			logger.Error(fmt.Sprintf("Failed to close websocket: %s", err))
 		}
 	}()
 
 	// Shell -> User
 	go func() {
-		defer wg.Done()
-
 		buffer := make([]byte, maxBufferSizeBytes)
 		for {
 			l, err := shellProc.Read(buffer)
@@ -112,9 +111,7 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 				logger.Error("Failed to forward tty to ws")
 			}
 		}
-
-		// Close the websocket, this unblocks and kills the User -> Shell go routine
-		// _ = ws.Close() // todo again do we need to now?
+		wg.Done()
 	}()
 
 	// User -> Shell
@@ -124,15 +121,13 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 		defer shellProc.Kill()
 
 		for {
-			typ, b, err := ws.Read(ctxLocal)
+			_, b, err := ws.Read(ctxLocal)
 			if err != nil {
 				logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
 				break
 			}
-			s.timeout.Ping()
 
-			fmt.Printf("msg type %v\n", typ)
-			fmt.Printf("msg %s\n", string(b))
+			s.timeout.Ping()
 
 			b = bytes.Trim(b, "\x00")
 
@@ -189,18 +184,24 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 
 	// Stop the handler if the global context is cancelled
 	go func() {
-		select {
-		case <-globalCtx.Done():
-			logger.Debug("Cancelling Websocket Handler")
-			if err := shellProc.Kill(); err != nil {
-				logger.Error(err.Error())
+		ticker := time.NewTicker(5 * time.Second)
+		for {
+			select {
+			case <-globalCtx.Done():
+				logger.Debug("Cancelling Websocket Handler")
+				if err := shellProc.Kill(); err != nil {
+					logger.Error(err.Error())
+				}
+				if err := ws.CloseNow(); err != nil {
+					logger.Error(err.Error())
+				}
+				return
+			case <-ctxLocal.Done():
+				logger.Info("Request Cancelled")
+				return
+			case <-ticker.C:
+				s.timeout.Ping()
 			}
-			if err := ws.CloseNow(); err != nil {
-				logger.Error(err.Error())
-			}
-			return
-		case <-ctxLocal.Done():
-			logger.Info("Request Cancelled")
 		}
 	}()
 
