@@ -8,15 +8,7 @@ import (
 )
 
 const (
-	logger        = "log/slog"
-	ecsVersion    = "8.10.0"
-	ecsVersionKey = "ecs.version"
-	timestampKey  = "@timestamp"
-	messageKey    = "message"
-	logLevelKey   = "log.level"
-	logLoggerKey  = "log.logger"
-	logKindKey    = "log.kind"
-	sourceKey     = "webshell.source"
+	ecsVersion = "8.10.0"
 )
 
 func replacer(groups []string, a slog.Attr) slog.Attr {
@@ -40,11 +32,11 @@ func NewHandler(w io.Writer, source string, logLevel *slog.LevelVar) *Handler {
 	}
 }
 
-func (x *Handler) Enabled(ctx context.Context, level slog.Level) bool {
-	return x.jsonHandler.Enabled(ctx, level)
+func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.jsonHandler.Enabled(ctx, level)
 }
 
-func (x *Handler) Handle(ctx context.Context, record slog.Record) error {
+func (h *Handler) Handle(ctx context.Context, record slog.Record) error {
 
 	var level = "info"
 	switch record.Level {
@@ -59,21 +51,30 @@ func (x *Handler) Handle(ctx context.Context, record slog.Record) error {
 	}
 
 	record.AddAttrs(
-		slog.Time(timestampKey, record.Time),
-		slog.String(messageKey, record.Message),
-		slog.String(logLevelKey, level),
-		slog.String(ecsVersionKey, ecsVersion),
-		slog.String(sourceKey, x.source),
+		slog.String("ecs.version", ecsVersion),
+		slog.Time("@timestamp", record.Time),
+		slog.String("message", record.Message),
+		slog.String("log.level", level),
+		slog.Group("user",
+			slog.String("id", os.Getenv("USER_ID")),
+			slog.String("name", os.Getenv("USER_NAME")),
+		),
+		slog.Group("webshell",
+			slog.String("source", h.source),
+			slog.String("token", os.Getenv("TOKEN")),
+			slog.String("service", os.Getenv("SERVICE")),
+		),
 	)
-	return x.jsonHandler.Handle(ctx, record)
+
+	return h.jsonHandler.Handle(ctx, record)
 }
 
-func (x *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &Handler{jsonHandler: x.jsonHandler.WithAttrs(attrs)}
+func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &Handler{jsonHandler: h.jsonHandler.WithAttrs(attrs)}
 }
 
-func (x *Handler) WithGroup(name string) slog.Handler {
-	return &Handler{jsonHandler: x.jsonHandler.WithGroup(name)}
+func (h *Handler) WithGroup(name string) slog.Handler {
+	return &Handler{jsonHandler: h.jsonHandler.WithGroup(name)}
 }
 
 func NewEcsLogger(source string, logLevel *slog.LevelVar) *slog.Logger {
