@@ -7,9 +7,10 @@ import (
 
 type termPageParams struct {
 	Token string
+	Title string
 }
 
-func termPageHandler(token string) http.Handler {
+func termPageHandler(token string, title string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -17,7 +18,7 @@ func termPageHandler(token string) http.Handler {
 		}
 
 		fmt.Printf("Token is being set to %s\n", token)
-		if err := termTemplate.Execute(w, termPageParams{Token: token}); err != nil {
+		if err := termTemplate.Execute(w, termPageParams{Token: token, Title: title}); err != nil {
 			logger.Error(fmt.Sprintf("%s", err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return

@@ -22,6 +22,8 @@ type Config struct {
 	Replay     bool
 	ReplayFile string
 	Grace      time.Duration
+	Theme      string
+	Title      string
 }
 
 func LoadConfig() Config {
@@ -52,6 +54,10 @@ func LoadConfig() Config {
 	// Replayer is still work-in-progress
 	flag.BoolVar(&cfg.Replay, "replay", false, "Enabled replay of audit files")
 	flag.StringVar(&cfg.ReplayFile, "replay-file", "", "Path to audit file to replay")
+
+	// UI customization
+	flag.StringVar(&cfg.Theme, "theme", "", "Path to custom theme.js file")
+	flag.StringVar(&cfg.Title, "title", "", "Custom title")
 
 	flag.Parse()
 

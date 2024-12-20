@@ -52,6 +52,12 @@ body {
     font-size: 1.2em;
 }
 
+.tab-title {
+    flex: fit-content;
+    text-align: right;
+    color: white;
+}
+
 .tab-content {
     order: 99;
     width: 100%;
@@ -60,7 +66,6 @@ body {
 }
 
 .file-section {
-    margin: 10px;
     color: #323232;
     background: #cecece;
     line-height: 1.5;
