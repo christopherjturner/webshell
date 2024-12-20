@@ -94,13 +94,16 @@ func buildRoutes() http.Handler {
 
 	var (
 		wsHandler       http.Handler = Shell{config, timeout}
-		termPageHandler http.Handler = termPageHandler(config.Token)
+		termPageHandler http.Handler = termPageHandler(config.Token, config.Title)
 		filesHandler    http.Handler = FilesHandler{
 			baseDir: config.HomeDir,
 			baseUrl: rootPath + "home",
 			user:    config.User,
 			logger:  logger,
 		}.Handler()
+		themeHandler = ThemeHandler{
+			themeFile: config.Theme,
+		}
 	)
 
 	// Add middleware to websocket handler.
@@ -120,6 +123,7 @@ func buildRoutes() http.Handler {
 	webshellMux.Handle("/home", filesHandler)
 	webshellMux.Handle("/upload", filesHandler)
 	webshellMux.Handle("/home/{filename...}", filesHandler)
+	webshellMux.Handle("/theme", themeHandler)
 	webshellMux.Handle("/assets/", http.FileServer(http.FS(assetsFS)))
 
 	// Playback of audit files. Still a work in progress

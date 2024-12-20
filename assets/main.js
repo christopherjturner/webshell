@@ -1,6 +1,17 @@
 let terminal
 let ws
 
+let terminalConfig = {
+        screenKeys: true,
+        useStyle: true,
+        cursorBlink: true,
+        fullscreenWin: true,
+        maximizeWin: true,
+        screenReaderMode: true,
+        fontFamily: 'Terminal, monospace',
+        scrollOnUserInput: false
+    }
+
 function debounce(func, timeout = 300) {
     let timer;
     return (...args) => {
@@ -15,17 +26,12 @@ function reloadFiles() {
 }
 
 function init(shellPath) {
-    terminal = new Terminal({
-        screenKeys: true,
-        useStyle: true,
-        cursorBlink: true,
-        fullscreenWin: true,
-        maximizeWin: true,
-        screenReaderMode: true,
-        fontFamily: 'Terminal, monospace',
-        scrollOnUserInput: false
-    })
+    terminal = new Terminal(terminalConfig)
 
+    // make the background match the terminal's background
+    if (terminalConfig.theme?.background) {
+        document.getElementById('terminal').style.background = terminalConfig.theme.background
+    }
 
     const protocol = (location.protocol === "https:") ? "wss://" : "ws://"
     const url = protocol + location.host + shellPath
