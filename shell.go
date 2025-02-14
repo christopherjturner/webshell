@@ -29,7 +29,9 @@ type Shell struct {
 func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Accept the WS connection
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{})
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
 	if err != nil {
 		logger.Error(err.Error())
 		return
