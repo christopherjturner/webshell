@@ -53,6 +53,7 @@ func (ka *InactivityTimeout) Start() {
 				case <-ka.C:
 					ka.lastActive = time.Now()
 				case <-ka.ticker.C:
+
 					if time.Since(ka.lastActive) >= ka.ttl {
 						logger.Info("Stopping server due to inactivity")
 						ka.shutdown()

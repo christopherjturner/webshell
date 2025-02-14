@@ -13,8 +13,6 @@ import (
 	"syscall"
 	"time"
 	"webshell/logging"
-
-	"golang.org/x/net/websocket"
 )
 
 //go:embed assets/*
@@ -130,7 +128,7 @@ func buildRoutes() http.Handler {
 
 	// Playback of audit files. Still a work in progress
 	if config.Replay {
-		webshellMux.Handle("/replay/ws", websocket.Handler(replayHandler))
+		webshellMux.Handle("/replay/ws", &Replayer{})
 		webshellMux.Handle("/replay", replayPageHandler(config.Token))
 	}
 

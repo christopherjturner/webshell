@@ -41,9 +41,9 @@ func LoadConfig() Config {
 	flag.BoolVar(&cfg.Once, "once", false, "Single use service, only accepts one connection")
 
 	// Grace period for once mode, how long do we give the user to reconnect if their connection drops.
-	// This uses user input and the ping message from the term to work out what's active. If we set this too short
-	// its possible to kill the server while a user is connected. Default ping interval is 5s.
-	graceSecs := flag.Int("grace", 30, "Seconds to wait after disconnecting before stopping server. Used with -once.")
+	// The terminal pings every 5 seconds, however when a tab is not focuses some browsers switch to a low-power
+	// mode where js timeout calls only run every 5 minutes.
+	graceSecs := flag.Int("grace", 600, "Seconds to wait after disconnecting before stopping server. Used with -once.")
 
 	// Turns on various auditing capabilities.
 	flag.BoolVar(&cfg.AuditTTY, "audit-tty", false, "Record users tty session for auditing")
