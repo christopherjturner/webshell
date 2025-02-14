@@ -9,7 +9,7 @@ let terminalConfig = {
         maximizeWin: true,
         screenReaderMode: true,
         fontFamily: 'Terminal, monospace',
-        scrollOnUserInput: false
+        scrollOnUserInput: true
     }
 
 function debounce(func, timeout = 300) {
