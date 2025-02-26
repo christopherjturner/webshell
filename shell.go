@@ -104,12 +104,13 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 		for {
 			l, err := shellProc.Read(buffer)
 			if err != nil {
-				ws.Write(ctxLocal, websocket.MessageText, []byte("Session Ended"))
+				logger.Error(fmt.Sprintf("err from shellProc: %s", err))
+				ws.Write(ctxLocal, websocket.MessageBinary, []byte("Session Ended"))
 				break
 			}
 
-			if err := ws.Write(ctxLocal, websocket.MessageText, buffer[:l]); err != nil {
-				logger.Error("Failed to forward tty to ws")
+			if err := ws.Write(ctxLocal, websocket.MessageBinary, buffer[:l]); err != nil {
+				logger.Error("Failed to forward tty to ws %s", err)
 			}
 		}
 		wg.Done()

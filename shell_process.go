@@ -22,11 +22,11 @@ type ShellProcess struct {
 	rec    *ttyrec.Recorder
 }
 
-func (sp *ShellProcess) Read(b []byte) (n int, err error) {
+func (sp *ShellProcess) Read(b []byte) (int, error) {
 	return sp.reader.Read(b)
 }
 
-func (sp *ShellProcess) Write(b []byte) (n int, err error) {
+func (sp *ShellProcess) Write(b []byte) (int, error) {
 	return sp.tty.Write(b)
 }
 
