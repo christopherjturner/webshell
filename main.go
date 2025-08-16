@@ -93,7 +93,12 @@ func buildRoutes() http.Handler {
 	}
 
 	var (
-		wsHandler       http.Handler = Shell{config, timeout}
+		wsHandler http.Handler = Shell{
+			config,
+			timeout,
+			NewSessionManager(config.Grace),
+		}
+
 		termPageHandler http.Handler = termPageHandler(config.Token, config.Title)
 		filesHandler    http.Handler = FilesHandler{
 			baseDir: config.HomeDir,

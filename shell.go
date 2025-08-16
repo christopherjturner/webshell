@@ -12,8 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
-
-	"webshell/ttyrec"
+	// "webshell/ttyrec"
 )
 
 const (
@@ -22,14 +21,15 @@ const (
 )
 
 type Shell struct {
-	config  Config
-	timeout Timeout
+	config   Config
+	timeout  Timeout
+	sessions *SessionManager
 }
 
 func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Accept the WS connection
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
@@ -37,41 +37,88 @@ func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start shell process
-	shellProcess := &ShellProcess{}
-	err = shellProcess.Start(shell)
+	// TODO: look at better ways of getting the id
+	id := r.URL.Path
+
+	newProc := func() (*ShellProcess, error) {
+		shellProcess := &ShellProcess{}
+		err = shellProcess.Start(shell)
+		return shellProcess, err
+	}
+
+	// Request the session
+	logger.Info(fmt.Sprintf("Getting session %s", id))
+	sess, err := s.sessions.GetSession(id, newProc)
 	if err != nil {
 		logger.Error(err.Error())
+		_ = ws.Close(websocket.StatusInternalError, "Failed to start session")
 		return
 	}
 
-	// Attach auditing if required
-	if s.config.AuditTTY {
-		timestamp := time.Now().Format(time.RFC3339)
-		auditFile := fmt.Sprintf("%s_%s.tty.audit", timestamp, s.config.Token)
-		recorder, err := ttyrec.NewRecorder(s.config.AuditPath, auditFile)
+	// Attach the client
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	_ = sess.Attach(ctx, ws)
+	logger.Info(fmt.Sprintf("Attached websocket to session %s", id))
+	defer sess.Detach()
+
+	for {
+		_, b, err := ws.Read(ctx)
 		if err != nil {
-			logger.Error(err.Error())
-			http.Error(w, "Audit setup failed", http.StatusInternalServerError)
-			return
+			logger.Warn(fmt.Sprintf("Websocket closed: %s", err))
+			break
 		}
-		shellProcess.WithTTYRecorder(recorder)
-		logger.Info(fmt.Sprintf("Recording TTY data to %s/%s", s.config.AuditPath, auditFile))
-		defer recorder.Save()
-	}
 
-	if s.config.AuditExec {
-		if err := shellProcess.WithAuditing(); err != nil {
-			logger.Error(err.Error())
-			http.Error(w, "Audit setup failed", http.StatusInternalServerError)
-			return
+		s.timeout.Ping()
+
+		b = bytes.Trim(b, "\x00")
+
+		if len(b) == 0 {
+			continue
+		}
+
+		// Special purpose payloads.
+		if b[0] == 1 {
+			specialPayload := string(bytes.Trim(b[1:], " \n\r\t\x00\x01"))
+
+			if specialPayload == "PING" {
+				continue
+			}
+
+			// Resize payload (SIZE COL ROW)
+			if strings.HasPrefix(specialPayload, "SIZE") {
+				fields := strings.Fields(specialPayload)
+				if len(fields) != 3 {
+					logger.Error("Invalid resize payload: " + specialPayload)
+					continue
+				}
+
+				cols, errCol := strconv.ParseInt(fields[1], 10, 16)
+				rows, errRow := strconv.ParseInt(fields[2], 10, 16)
+
+				if errCol != nil || errRow != nil {
+					logger.Error("Invalid resize payload: " + specialPayload)
+					continue
+				}
+
+				logger.Debug(fmt.Sprintf("Resizing tty to use %d rows and %d columns...", rows, cols))
+
+				if err := sess.Resize(uint16(rows), uint16(cols)); err != nil {
+					logger.Warn(fmt.Sprintf("Failed to resize tty, error: %s", err))
+				}
+				continue
+			}
+
+			logger.Info("Unknown special payload " + specialPayload)
+		}
+
+		// Send user input to shell process
+		_, err = sess.WriteToTTY(b)
+		if err != nil {
+			logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 		}
 	}
-
-	// Pass to websocket handler
-	s.timeout.Start()
-	s.shellHandler(r.Context(), conn, shellProcess)
-
 }
 
 // WebShell's websocket handler
@@ -119,7 +166,7 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 		}
 	}()
 
-	// User -> Shell
+	// WS -> TTY
 	go func() {
 		defer wg.Done()
 		for {
