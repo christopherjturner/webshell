@@ -136,12 +136,12 @@ func (fh FilesHandler) listFiles(w http.ResponseWriter, dirname string, error st
 
 	// Sort by dir first then by name.
 	sort.Slice(params.Files, func(i, j int) bool {
-		if params.Files[i].IsDir && !params.Files[j].IsDir {
-			return true
+		// directories come first
+		if params.Files[i].IsDir != params.Files[j].IsDir {
+			return params.Files[i].IsDir
 		}
-
-		return (params.Files[i].IsDir || params.Files[j].IsDir) &&
-			params.Files[i].Name < params.Files[j].Name
+		// then sort by name
+		return params.Files[i].Name < params.Files[j].Name
 	})
 
 	// Render the template.

@@ -83,13 +83,16 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 	defer cancelLocal()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(2)
 	activeConnections.Add(1)
 	defer activeConnections.Done()
 
 	// Gracefully stop the session
 	defer func() {
 		logger.Info("Stopping webshell")
+		cancelLocal()
+		wg.Wait() // Wait for both goroutines to finish.
+
 		if err := shellProc.Kill(); err != nil {
 			logger.Error("Failed to kill shell process")
 		}
@@ -100,6 +103,7 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 
 	// Shell -> User
 	go func() {
+		defer wg.Done()
 		buffer := make([]byte, maxBufferSizeBytes)
 		for {
 			l, err := shellProc.Read(buffer)
@@ -113,15 +117,11 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 				logger.Error("Failed to forward tty to ws %s", err)
 			}
 		}
-		wg.Done()
 	}()
 
 	// User -> Shell
 	go func() {
-
-		// Kill the shell when the reader exits. TODO: can do move this outside the go routines?
-		defer shellProc.Kill()
-
+		defer wg.Done()
 		for {
 			_, b, err := ws.Read(ctxLocal)
 			if err != nil {
@@ -181,7 +181,6 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 				logger.Error(fmt.Sprintf("Failed to write to TTY: %s", err))
 			}
 		}
-
 	}()
 
 	// Stop the handler if the global context is cancelled
