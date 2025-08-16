@@ -15,11 +15,13 @@ import (
 )
 
 type ShellProcess struct {
-	cmd    *exec.Cmd
-	tty    *os.File
-	reader io.Reader
-	once   sync.Once
-	rec    *ttyrec.Recorder
+	cmd      *exec.Cmd
+	tty      *os.File
+	reader   io.Reader
+	once     sync.Once
+	rec      *ttyrec.Recorder
+	waitOnce sync.Once
+	waitErr  error
 }
 
 func (sp *ShellProcess) Read(b []byte) (int, error) {
@@ -66,10 +68,15 @@ func (sp *ShellProcess) WithAuditing() error {
 	return nil
 }
 
-func (sp *ShellProcess) WithTTYRecorder(recorder *ttyrec.Recorder) error {
-	// TODO: check shell is running
-	sp.reader = io.TeeReader(sp.tty, recorder)
-	return nil
+func (sp *ShellProcess) Wait() error {
+	if sp.cmd == nil {
+		return nil
+	}
+
+	sp.waitOnce.Do(func() {
+		sp.waitErr = sp.cmd.Wait()
+	})
+	return sp.waitErr
 }
 
 func (sp *ShellProcess) Kill() error {

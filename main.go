@@ -88,15 +88,14 @@ func buildRoutes() http.Handler {
 	rootPrefix := "/" + config.Token
 	rootPath := rootPrefix + "/"
 	var timeout Timeout = &NoOpTimeout{}
-	if config.Once {
-		timeout = NewInactivityTimeout(globalCtx, config.Grace)
-	}
 
 	var (
+		sessionManager = NewSessionManager(config)
+
 		wsHandler http.Handler = Shell{
 			config,
 			timeout,
-			NewSessionManager(config.Grace),
+			sessionManager,
 		}
 
 		termPageHandler http.Handler = termPageHandler(config.Token, config.Title)
@@ -113,13 +112,15 @@ func buildRoutes() http.Handler {
 
 	// Add middleware to websocket handler.
 	if config.Once {
-		timeout = NewInactivityTimeout(globalCtx, config.Grace)
+		timeout = NewInactivityTimeout(globalCtx, config.Grace, sessionManager)
 		o := NewOnceMiddleware(rootPrefix)
 		wsHandler = o.once(wsHandler)
 		termPageHandler = o.setCookie(termPageHandler)
 		filesHandler = o.requireCookie(filesHandler)
 		logger.Info("Server will EXIT after the first connection closes")
 	}
+
+	timeout.Start()
 
 	// Webshell routes.
 	webshellMux := http.NewServeMux()
