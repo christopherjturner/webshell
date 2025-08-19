@@ -3,22 +3,29 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type termPageParams struct {
-	Token string
-	Title string
+	Token   string
+	Title   string
+	Start   int64
+	Timeout int
 }
 
-func termPageHandler(token string, title string) http.Handler {
+func termPageHandler(token string, title string, start time.Time, timeout int) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 
-		fmt.Printf("Token is being set to %s\n", token)
-		if err := termTemplate.Execute(w, termPageParams{Token: token, Title: title}); err != nil {
+		params := termPageParams{
+			Token: token,
+			Title: title, Start: start.Unix() * 1000,
+			Timeout: timeout,
+		}
+		if err := termTemplate.Execute(w, params); err != nil {
 			logger.Error(fmt.Sprintf("%s", err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return

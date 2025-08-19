@@ -31,16 +31,27 @@
       <iframe src="/{{ .Token }}/home" frameborder="0" title="File uploads" id="file-frame"></iframe>
     </div>
   </div>
+
   <label class="tab-label tab-title">
     {{ .Title }}
+  </label>
+
+  <label id="timeout" class="tab-label tab-title" data-start="{{ .Start }}" data-ttl="{{ .Timeout }}">
   </label>
 
 </div>
 
 <script src="./assets/main.js"></script>
+<script src="./assets/timer.js"></script>
 <script src="./theme"></script>
 <script type="text/javascript">
   init("/{{ .Token }}/shell")
 </script>
+
+<script type="text/javascript">
+  const el = document.getElementById("timeout")
+  startTimer(el)
+</script>
+
 </body>
 </html>
