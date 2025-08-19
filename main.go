@@ -94,7 +94,7 @@ func buildRoutes() http.Handler {
 
 	var (
 		wsHandler       http.Handler = Shell{config, timeout}
-		termPageHandler http.Handler = termPageHandler(config.Token, config.Title)
+		termPageHandler http.Handler = termPageHandler(config.Token, config.Title, time.Now(), config.GlobalTTL)
 		filesHandler    http.Handler = FilesHandler{
 			baseDir: config.HomeDir,
 			baseUrl: rootPath + "home",

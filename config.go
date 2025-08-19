@@ -24,6 +24,7 @@ type Config struct {
 	Grace      time.Duration
 	Theme      string
 	Title      string
+	GlobalTTL  int
 }
 
 func LoadConfig() Config {
@@ -92,8 +93,7 @@ func LoadConfig() Config {
 func LoadConfigFromEnv() Config {
 	cfg := LoadConfig()
 
-	port, ok := os.LookupEnv("PORT")
-	if ok {
+	if port, ok := os.LookupEnv("PORT"); ok {
 		if p, err := strconv.Atoi(port); err == nil {
 			cfg.Port = p
 		}
@@ -105,6 +105,12 @@ func LoadConfigFromEnv() Config {
 
 	if home, ok := os.LookupEnv("HOMEDIR"); ok {
 		cfg.HomeDir = home
+	}
+
+	if timeout, ok := os.LookupEnv("TIMEOUT"); ok {
+		if ttl, err := strconv.Atoi(timeout); err == nil {
+			cfg.GlobalTTL = ttl
+		}
 	}
 
 	return cfg

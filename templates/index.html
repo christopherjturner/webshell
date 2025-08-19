@@ -31,6 +31,10 @@
       <iframe src="/{{ .Token }}/home" frameborder="0" title="File uploads" id="file-frame"></iframe>
     </div>
   </div>
+
+  <label id="timeout" class="tab-label tab-title" data-start="{{ .Start }}" data-ttl="{{ .Timeout }}">
+  </label>
+
   <label class="tab-label tab-title">
     {{ .Title }}
   </label>
@@ -42,5 +46,39 @@
 <script type="text/javascript">
   init("/{{ .Token }}/shell")
 </script>
+
+<script type="text/javascript">
+  const el = document.getElementById("timeout")
+  const start = parseInt(el.dataset.start, 10) // ms timestamp
+  const ttl = parseInt(el.dataset.ttl, 10)     // seconds
+
+  function formatRemaining(start, ttl) {
+      const now = Date.now()
+      const end = start + ttl * 1000 // ttl is in seconds
+      let remaining = Math.max(0, Math.floor((end - now) / 1000)) // in seconds
+      const hours = String(Math.floor(remaining / 3600)).padStart(2, '0')
+      remaining %= 3600
+      const minutes = String(Math.floor(remaining / 60)).padStart(2, '0')
+      const seconds = String(remaining % 60).padStart(2, '0')
+
+      return `Session ends in ${hours}:${minutes}:${seconds}`
+  }
+
+  function update() {
+      el.textContent = formatRemaining(start, ttl);
+  }
+
+  if (ttl > 0) {
+      update();
+      const interval = setInterval(() => {
+          update();
+          if (el.textContent === "00:00:00") {
+              clearInterval(interval);
+          }
+      }, 1000);
+  }
+
+</script>
+
 </body>
 </html>
