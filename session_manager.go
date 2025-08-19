@@ -61,7 +61,6 @@ func (sm *SessionManager) GetSession(id string, newProc func() (*ShellProcess, e
 			delete(sm.sessions, id)
 		}
 		sm.mu.Unlock()
-
 	}()
 
 	return session, nil
@@ -69,17 +68,14 @@ func (sm *SessionManager) GetSession(id string, newProc func() (*ShellProcess, e
 
 func (sm *SessionManager) ExpireSessions() {
 
-	for id, session := range sm.sessions {
-		idleDuration := time.Since(session.lastActive.Load().(time.Time))
-		fmt.Printf("%s -> %v\n", id, idleDuration)
-		if idleDuration >= sm.ttl {
-			if session.client == nil {
-				logger.Info("Session has expired, no client connected")
-			} else {
-				logger.Info("Session has expired, client connected but idle")
-			}
+	// check each session, see if expired
 
-			// TODO: actually close the session.
+	// use the most recent lastActive
+
+	for _, session := range sm.sessions {
+		idleDuration := time.Since(session.lastActive.Load().(time.Time))
+		if idleDuration >= sm.ttl {
+			session.Done()
 		}
 	}
 }

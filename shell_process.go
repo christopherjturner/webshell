@@ -53,10 +53,14 @@ func (sp *ShellProcess) Start(command string, args ...string) error {
 	sp.tty = tty
 	sp.reader = tty
 
+	// enable strace-based auditing
+	if config.AuditExec {
+		sp.audit()
+	}
 	return err
 }
 
-func (sp *ShellProcess) WithAuditing() error {
+func (sp *ShellProcess) audit() error {
 	// TODO: check shell is running
 	straceAudit := strace.NewStraceLogger(auditLogger)
 	if err := straceAudit.Attach(sp.cmd.Process.Pid); err != nil {

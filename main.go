@@ -143,6 +143,7 @@ func buildRoutes() http.Handler {
 	rootMux.Handle(rootPath, http.StripPrefix(rootPrefix, webshellMux))
 	rootMux.HandleFunc("/health", healthHandler)
 	rootMux.HandleFunc("/debug", debugHandler)
+	rootMux.Handle("/debug/session", SessionDebug{manager: sessionManager})
 
 	return rootMux
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -34,10 +35,9 @@ func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: look at better ways of getting the id
-	fmt.Printf("%v\n", r)
-	fmt.Printf("%v\n", r.URL)
-	id := "12345" // r.URL.Path
+	// TODO: we assume we're using the token for the session id
+	// maybe we'd be better using the cookie, presuming its set.
+	id := base64.StdEncoding.EncodeToString([]byte(r.RequestURI))
 
 	newProc := func() (*ShellProcess, error) {
 		shellProcess := &ShellProcess{}

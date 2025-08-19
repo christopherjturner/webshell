@@ -1,5 +1,6 @@
 let terminal
 let ws
+let attachAddon
 
 let terminalConfig = {
         screenKeys: true,
@@ -25,6 +26,15 @@ function reloadFiles() {
     frame.src = frame.src
 }
 
+function reconnect(url) {
+    attachAddon.dispose()
+    ws = new WebSocket(url)
+    ws.onopen = function() {
+        attachAddon = new AttachAddon.AttachAddon(ws)
+        terminal.loadAddon(attachAddon)
+    }
+}
+
 function init(shellPath) {
     terminal = new Terminal(terminalConfig)
 
@@ -36,7 +46,7 @@ function init(shellPath) {
     const protocol = (location.protocol === "https:") ? "wss://" : "ws://"
     const url = protocol + location.host + shellPath
     ws = new WebSocket(url)
-    const attachAddon = new AttachAddon.AttachAddon(ws)
+    attachAddon = new AttachAddon.AttachAddon(ws)
     const fitAddon = new FitAddon.FitAddon()
 
     terminal.loadAddon(attachAddon)
