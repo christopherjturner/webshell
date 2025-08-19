@@ -1,6 +1,9 @@
 let terminal
 let ws
 let attachAddon
+let falloff = 1000
+let fitAddon
+
 
 let terminalConfig = {
         screenKeys: true,
@@ -27,50 +30,21 @@ function reloadFiles() {
 }
 
 function reconnect(url) {
-    attachAddon.dispose()
+
     ws = new WebSocket(url)
-    ws.onopen = function() {
-        attachAddon = new AttachAddon.AttachAddon(ws)
-        terminal.loadAddon(attachAddon)
-    }
-}
-
-function init(shellPath) {
-    terminal = new Terminal(terminalConfig)
-
-    // make the background match the terminal's background
-    if (terminalConfig.theme?.background) {
-        document.getElementById('terminal').style.background = terminalConfig.theme.background
-    }
-
-    const protocol = (location.protocol === "https:") ? "wss://" : "ws://"
-    const url = protocol + location.host + shellPath
-    ws = new WebSocket(url)
-    attachAddon = new AttachAddon.AttachAddon(ws)
-    const fitAddon = new FitAddon.FitAddon()
-
-    terminal.loadAddon(attachAddon)
-    terminal.loadAddon(fitAddon)
-    terminal.open(document.getElementById("terminal"))
-    terminal._initialized = true
-
-    function ping() {
-        try {
-            if (ws && ws.readyState === 1) {
-                const msg = new TextEncoder().encode("\x01PING")
-                ws.send(msg);
-            }
-        } catch (e) {
-            console.error("ping failed")
-        }
-        setTimeout(ping, 5000);
-    }
 
     ws.onclose = function () {
+        if (attachAddon) attachAddon.dispose()
+
         terminal.write('\r\n\nTerminal connection closed\r\n')
+        setTimeout(() => reconnect(url), falloff)
+        falloff *= 2
     }
 
     ws.onopen = function () {
+        attachAddon = new AttachAddon.AttachAddon(ws)
+        terminal.loadAddon(attachAddon)
+
         terminal.focus()
         setTimeout(function () {
             fitAddon.fit()
@@ -90,8 +64,42 @@ function init(shellPath) {
         window.onresize = debounce(function () {
             fitAddon.fit()
         })
-
     }
+
+}
+
+function ping() {
+    try {
+        if (ws && ws.readyState === 1) {
+            const msg = new TextEncoder().encode("\x01PING")
+            ws.send(msg);
+        }
+    } catch (e) {
+        console.error("ping failed")
+    }
+    setTimeout(ping, 5000);
+}
+
+function init(shellPath) {
+    terminal = new Terminal(terminalConfig)
+
+    // make the background match the terminal's background
+    if (terminalConfig.theme?.background) {
+        document.getElementById('terminal').style.background = terminalConfig.theme.background
+    }
+
+    const protocol = (location.protocol === "https:") ? "wss://" : "ws://"
+    const url = protocol + location.host + shellPath
+
+    reconnect(url)
+    //ws = new WebSocket(url)
+    //attachAddon = new AttachAddon.AttachAddon(ws)
+    fitAddon = new FitAddon.FitAddon()
+
+    //terminal.loadAddon(attachAddon)
+    terminal.loadAddon(fitAddon)
+    terminal.open(document.getElementById("terminal"))
+    terminal._initialized = true
 
     const fileTab = document.getElementById('tab-2')
     if(fileTab) {
