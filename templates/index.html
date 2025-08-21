@@ -32,6 +32,7 @@
     </div>
   </div>
 
+
   <label class="tab-label tab-title">
     {{ .Title }}
   </label>
@@ -46,9 +47,6 @@
 <script src="./theme"></script>
 <script type="text/javascript">
   init("/{{ .Token }}/shell")
-</script>
-
-<script type="text/javascript">
   const el = document.getElementById("timeout")
   startTimer(el)
 </script>
