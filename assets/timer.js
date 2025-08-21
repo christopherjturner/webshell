@@ -10,6 +10,10 @@ function formatRemaining(start, ttl) {
     return `Session ends in ${hours}:${minutes}:${seconds}`
 }
 
+function hideIfClosed(el) {
+
+}
+
 function startTimer(el) {
     try {
 
@@ -22,11 +26,15 @@ function startTimer(el) {
 
         el.textContent = formatRemaining(start, ttl);
         const interval = setInterval(() => {
-            el.textContent = formatRemaining(start, ttl);
-
-            if (el.textContent.endsWith("00:00:00")) {
-                clearInterval(interval);
+            if (ws && ws.readyState === ws.OPEN) {
+                el.textContent = formatRemaining(start, ttl);
+                if (el.textContent.endsWith("00:00:00")) {
+                    clearInterval(interval);
+                }
+            } else {
+                el.textContent = ""
             }
+
         }, 1000)
     } catch (e) {
         console.log(e)
