@@ -1,8 +1,12 @@
 let terminal
 let ws
 let attachAddon
-let falloff = 1000
+const baseFalloff = 1000
+const maxFalloff = 30000
+let falloff = baseFalloff
 let fitAddon
+let pingTimer = null
+let resizeHandler = null
 
 
 let terminalConfig = {
@@ -34,14 +38,16 @@ function reconnect(url) {
     ws = new WebSocket(url)
 
     ws.onclose = function () {
+        stopPing()
         if (attachAddon) attachAddon.dispose()
 
         terminal.write('\r\n\nTerminal connection closed\r\n')
         setTimeout(() => reconnect(url), falloff)
-        falloff *= 2
+        falloff = Math.min(falloff * 2, maxFalloff)
     }
 
     ws.onopen = function () {
+        falloff = baseFalloff
         attachAddon = new AttachAddon.AttachAddon(ws)
         terminal.loadAddon(attachAddon)
 
@@ -50,16 +56,12 @@ function reconnect(url) {
             fitAddon.fit()
         })
 
-        terminal.onResize(debounce(function (event) {
-            const rows = event.rows
-            const cols = event.cols
-
-            console.log(`resizing col:${cols} row:${rows}`)
-            const msg = new TextEncoder().encode("\x01SIZE " + cols + " " + (rows + 1))
+        if (ws.readyState === 1) {
+            const msg = new TextEncoder().encode("\x01SIZE " + terminal.cols + " " + (terminal.rows + 1))
             ws.send(msg)
-        }))
+        }
 
-        ping()
+        startPing()
 
         window.onresize = debounce(function () {
             fitAddon.fit()
@@ -68,16 +70,30 @@ function reconnect(url) {
 
 }
 
-function ping() {
-    try {
-        if (ws && ws.readyState === 1) {
-            const msg = new TextEncoder().encode("\x01PING")
-            ws.send(msg);
+function schedulePing() {
+    pingTimer = setTimeout(function() {
+        try {
+            if (ws && ws.readyState === 1) {
+                const msg = new TextEncoder().encode("\x01PING")
+                ws.send(msg)
+            }
+        } catch (e) {
+            console.error("ping failed")
         }
-    } catch (e) {
-        console.error("ping failed")
+        schedulePing()
+    }, 5000)
+}
+
+function startPing() {
+    stopPing()
+    schedulePing()
+}
+
+function stopPing() {
+    if (pingTimer !== null) {
+        clearTimeout(pingTimer)
+        pingTimer = null
     }
-    setTimeout(ping, 5000);
 }
 
 function init(shellPath) {
@@ -101,9 +117,21 @@ function init(shellPath) {
     terminal.open(document.getElementById("terminal"))
     terminal._initialized = true
 
+    resizeHandler = debounce(function (event) {
+        if (!ws || ws.readyState !== 1) {
+            return
+        }
+        const rows = event.rows
+        const cols = event.cols
+
+        console.log(`resizing col:${cols} row:${rows}`)
+        const msg = new TextEncoder().encode("\x01SIZE " + cols + " " + (rows + 1))
+        ws.send(msg)
+    })
+    terminal.onResize(resizeHandler)
+
     const fileTab = document.getElementById('tab-2')
     if(fileTab) {
         fileTab.addEventListener('change', reloadFiles)
     }
 }
-
