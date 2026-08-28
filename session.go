@@ -156,6 +156,10 @@ func (s *Session) Done() <-chan struct{} {
 	return s.done
 }
 
+func (s *Session) Close() {
+	s.close()
+}
+
 func (s *Session) close() {
 	select {
 	case <-s.done:

@@ -76,6 +76,7 @@ func (sm *SessionManager) ExpireSessions() {
 		idleDuration := time.Since(session.lastActive.Load().(time.Time))
 		if idleDuration >= sm.ttl {
 			session.Done()
+			session.Close()
 		}
 	}
 }
