@@ -39,11 +39,10 @@ func main() {
 	routes := buildRoutes()
 
 	server := &http.Server{
-		Addr:           fmt.Sprintf(":%d", config.Port),
-		Handler:        requestLogger(routes),
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+		Addr:              fmt.Sprintf(":%d", config.Port),
+		Handler:           requestLogger(routes),
+		ReadHeaderTimeout: 20 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	// Handle shutdown signals.
