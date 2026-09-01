@@ -61,7 +61,7 @@ function reconnect(url) {
             ws.send(msg)
         }
 
-        startPing()
+        //startPing()
 
         window.onresize = debounce(function () {
             fitAddon.fit()

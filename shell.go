@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/coder/websocket"
-	// "webshell/ttyrec"
 )
 
 const (
@@ -29,6 +29,9 @@ func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Accept the WS connection
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
+		OnPongReceived: func(ctx context.Context, payload []byte) {
+			logger.Info("PONG")
+		},
 	})
 	if err != nil {
 		logger.Error(err.Error())
@@ -61,6 +64,30 @@ func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = sess.Attach(ctx, ws)
 	logger.Info(fmt.Sprintf("Attached websocket to session %s", id))
 	defer sess.Detach()
+
+	// Start the server to client ping loop
+	go func() {
+		ticker := time.NewTicker(time.Duration(s.config.PingSecs) * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				pingCtx, pingCancel := context.WithTimeout(ctx, time.Duration(5)*time.Second)
+				logger.Info("Sending ping")
+				err := ws.Ping(pingCtx)
+				pingCancel()
+				if err != nil {
+					logger.Warn(fmt.Sprintf("Websocket ping failed for session %s: %v", id, err))
+					cancel()
+					return
+				}
+				s.timeout.Ping()
+			}
+		}
+	}()
 
 	for {
 		_, b, err := ws.Read(ctx)

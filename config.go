@@ -22,6 +22,7 @@ type Config struct {
 	Replay     bool
 	ReplayFile string
 	Grace      time.Duration
+	PingSecs   int
 	Theme      string
 	Title      string
 }
@@ -44,6 +45,9 @@ func LoadConfig() Config {
 	// The terminal pings every 5 seconds, however when a tab is not focuses some browsers switch to a low-power
 	// mode where js timeout calls only run every 5 minutes.
 	graceSecs := flag.Int("grace", 600, "Seconds to wait after disconnecting before stopping server. Used with -once.")
+
+	// Server to client ping frequency in seconds.
+	flag.IntVar(&cfg.PingSecs, "ping", 15, "How often to ping the client")
 
 	// Turns on various auditing capabilities.
 	flag.BoolVar(&cfg.AuditTTY, "audit-tty", false, "Record users tty session for auditing")
