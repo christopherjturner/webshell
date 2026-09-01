@@ -76,7 +76,7 @@ func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			case <-ticker.C:
 				pingCtx, pingCancel := context.WithTimeout(ctx, time.Duration(5)*time.Second)
-				logger.Info("Sending ping")
+				logger.Info("PING")
 				err := ws.Ping(pingCtx)
 				pingCancel()
 				if err != nil {
