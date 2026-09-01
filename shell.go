@@ -31,6 +31,7 @@ func (s Shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		InsecureSkipVerify: true,
 		OnPongReceived: func(ctx context.Context, payload []byte) {
 			logger.Info("PONG")
+			s.timeout.Ping()
 		},
 	})
 	if err != nil {
