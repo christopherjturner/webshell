@@ -44,23 +44,34 @@ function init(shellPath) {
     terminal.open(document.getElementById("terminal"))
     terminal._initialized = true
 
-    function ping() {
-        try {
-            if (ws && ws.readyState === 1) {
-                const msg = new TextEncoder().encode("\x01PING")
-                ws.send(msg);
-            }
-        } catch (e) {
-            console.error("ping failed")
+
+    const timerWorkerBlob = new Blob([`
+      let timer = null;
+      self.onmessage = (e) => {
+        if (e.data === 'start') {
+          timer = setInterval(() => self.postMessage('tick'), 5000);
+        } else if (e.data === 'stop') {
+          clearInterval(timer);
         }
-        setTimeout(ping, 5000);
-    }
+      };
+`], { type: 'application/javascript' });
+
+    const timerWorker = new Worker(URL.createObjectURL(timerWorkerBlob));
+    timerWorker.onmessage = (e) => {
+        if (e.data === 'tick'&& ws && ws.readyState === WebSocket.OPEN) {
+            console.log("PING")
+            const msg = new TextEncoder().encode("\x01PING")
+            ws.send(msg);
+        }
+    };
 
     ws.onclose = function () {
+        timerWorker.postMessage('stop');
         terminal.write('\r\n\nTerminal connection closed\r\n')
     }
 
     ws.onopen = function () {
+
         terminal.focus()
         setTimeout(function () {
             fitAddon.fit()
@@ -75,8 +86,7 @@ function init(shellPath) {
             ws.send(msg)
         }))
 
-        ping()
-
+        timerWorker.postMessage('start');
         window.onresize = debounce(function () {
             fitAddon.fit()
         })

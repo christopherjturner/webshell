@@ -87,9 +87,6 @@ func buildRoutes() http.Handler {
 	rootPrefix := "/" + config.Token
 	rootPath := rootPrefix + "/"
 	var timeout Timeout = &NoOpTimeout{}
-	if config.Once {
-		timeout = NewInactivityTimeout(globalCtx, config.Grace)
-	}
 
 	var (
 		wsHandler       http.Handler = Shell{config, timeout}
