@@ -98,6 +98,28 @@ func (s Shell) shellHandler(ctxReq context.Context, ws *websocket.Conn, shellPro
 		}
 	}()
 
+	// Server -> Client Ping
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctxLocal.Done():
+				return
+			case <-ticker.C:
+				pingCtx, pingCancel := context.WithTimeout(ctxLocal, 10*time.Second)
+				err := ws.Ping(pingCtx)
+				pingCancel()
+				logger.Debug("PING")
+				if err != nil {
+					logger.Error("Ping failed %v", err)
+					//cancelLocal()
+					return
+				}
+			}
+		}
+	}()
+
 	// Shell -> User
 	go func() {
 		buffer := make([]byte, maxBufferSizeBytes)
