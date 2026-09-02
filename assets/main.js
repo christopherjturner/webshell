@@ -93,6 +93,10 @@ function init(shellPath) {
 
     }
 
+    ws.onerror = function () {
+        console.log("WebSocket error: ", event)
+    }
+
     const fileTab = document.getElementById('tab-2')
     if(fileTab) {
         fileTab.addEventListener('change', reloadFiles)
